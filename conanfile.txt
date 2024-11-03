@@ -1,5 +1,6 @@
 [requires]
 catch2/3.5.2
+opengl/system
 
 [generators]
 CMakeDeps

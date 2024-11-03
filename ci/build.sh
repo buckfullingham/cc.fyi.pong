@@ -2,7 +2,6 @@
 
 # exit on error
 set -e
-set -x
 
 BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
@@ -12,21 +11,23 @@ BUILD_DIR="${BUILD_DIR:-"cmake-build-$BUILD_TYPE_LC"}"
 export CC=emcc
 export CXX=em++
 
+apt update
+apt install -vy libgl-dev
+
 # check python, pip & cmake are installed
 python3 --version
 pip3 --version
 cmake --version
 
-pip3 install -U -r "$BUILD_ROOT/ci/requirements.txt" || true
+pip3 install -U -r "$BUILD_ROOT/ci/requirements.txt"
 
-# create default profile if missing
 conan profile detect || true
 
 CONAN_SETTINGS=(
   -s os=Emscripten
   -s arch=wasm
   -s compiler=clang
-  -s compiler.version=17
+  -s compiler.version=19
   -s compiler.libcxx=libc++
   -s build_type="$BUILD_TYPE"
 )
