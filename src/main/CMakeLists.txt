@@ -1,17 +1,33 @@
+find_package(imgui REQUIRED)
 find_package(opengl_system REQUIRED)
+
+add_library(
+        imgui-backend OBJECT
+        imgui_impl_glfw.cpp
+        imgui_impl_opengl3.cpp
+)
+
+target_link_libraries(
+        imgui-backend PUBLIC
+        imgui::imgui
+        opengl::opengl
+)
+
+target_compile_options(
+        imgui-backend PUBLIC
+        -Wno-unused-parameter
+)
 
 add_executable(pong.html
         pong.cpp
-        esUtil.cpp
 )
 
 target_link_libraries(
         pong.html PRIVATE
-        opengl::opengl
+        imgui-backend
 )
 
 target_link_options(
         pong.html PRIVATE
-        -sMIN_WEBGL_VERSION=2
-        -sMAX_WEBGL_VERSION=2
+        -sUSE_GLFW=3
 )

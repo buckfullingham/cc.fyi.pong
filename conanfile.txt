@@ -1,6 +1,6 @@
 [requires]
 catch2/3.5.2
-opengl/system
+imgui/1.91.4
 
 [generators]
 CMakeDeps
