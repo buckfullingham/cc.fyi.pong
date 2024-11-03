@@ -1,0 +1,7 @@
+[requires]
+catch2/3.5.2
+
+[generators]
+CMakeDeps
+CMakeToolchain
+VirtualRunEnv
