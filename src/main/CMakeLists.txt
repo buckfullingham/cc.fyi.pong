@@ -1,5 +1,6 @@
 find_package(imgui REQUIRED)
 find_package(opengl_system REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 add_library(
         imgui-backend OBJECT
@@ -25,6 +26,7 @@ add_executable(pong.html
 target_link_libraries(
         pong.html PRIVATE
         imgui-backend
+        Eigen3::Eigen
 )
 
 target_link_options(

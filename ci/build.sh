@@ -27,11 +27,12 @@ CONAN_SETTINGS=(
   -s os=Emscripten
   -s arch=wasm
   -s compiler=clang
-  -s compiler.version=19
+  -s compiler.version=17
   -s compiler.libcxx=libc++
   -s build_type="$BUILD_TYPE"
 )
 
+export CFLAGS=-msimd128
 cd "$BUILD_ROOT"
 conan install -of "$BUILD_DIR" --build=missing "${CONAN_SETTINGS[@]}" .
 

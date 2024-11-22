@@ -1,18 +1,38 @@
 find_package(Catch2 REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(hash-library REQUIRED)
 
 include(CTest)
 include(Catch)
+
+add_library(test-lib INTERFACE
+)
+
+target_link_libraries(test-lib INTERFACE
+        Catch2::Catch2WithMain
+        Eigen3::Eigen
+        hash-library::hash-library
+)
+
+target_include_directories(test-lib INTERFACE
+        ../main
+)
 
 add_executable(tests
         tests.cpp
 )
 
-target_include_directories(tests PRIVATE
-        ../main
-)
-
 target_link_libraries(tests PRIVATE
-        Catch2::Catch2WithMain
+        test-lib
 )
 
-add_test(NAME "breaking test" COMMAND node "breaking test")
+add_executable(model
+        model.cpp
+)
+
+target_link_libraries(model PRIVATE
+        test-lib
+)
+
+add_test(NAME "tests" COMMAND node tests)
+add_test(NAME "model" COMMAND node model)

@@ -1,6 +1,9 @@
 [requires]
 catch2/3.5.2
 imgui/1.91.4
+eigen/3.4.0
+opengl/system
+hash-library/8.0
 
 [generators]
 CMakeDeps
