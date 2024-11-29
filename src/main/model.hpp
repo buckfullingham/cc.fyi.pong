@@ -7,6 +7,7 @@
 #include <concepts>
 #include <iostream>
 #include <numeric>
+#include <optional>
 
 #define MEMBER_GETTER_SETTER(TYPE, NAME)                                       \
 public:                                                                        \

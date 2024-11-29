@@ -34,5 +34,5 @@ target_link_libraries(model PRIVATE
         test-lib
 )
 
-add_test(NAME "tests" COMMAND node tests)
-add_test(NAME "model" COMMAND node model)
+catch_discover_tests(tests)
+catch_discover_tests(model)

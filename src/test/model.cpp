@@ -8,9 +8,9 @@ TEST_CASE("horizontal and vertical collisions with arena") {
   pong::arena_t a;
   using pong::box_t;
   using pong::vec_t;
-  a.box().min() = {-100.f, -100.f};
-  a.box().max() = {100.f, 100.f};
-  a.puck().centre() = {};
+  a.box().min() = vec_t{-100.f, -100.f};
+  a.box().max() = vec_t{100.f, 100.f};
+  a.puck().centre() = vec_t{0.f, 0.f};
   a.puck().radius() = 5.f;
 
   // place paddles out of the way
@@ -37,7 +37,7 @@ TEST_CASE("advance time through a horizontal collision with a paddle") {
   pong::arena_t a;
   a.box().min() = {-100.f, -100.f};
   a.box().max() = {100.f, 100.f};
-  a.puck().centre() = {};
+  a.puck().centre() = {0.f, 0.f};
   a.puck().radius() = 5.f;
   a.puck().velocity() = {1.f, 0.f};
   a.lhs_paddle().box().min() = {10.f, 10.f};

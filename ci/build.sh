@@ -3,42 +3,43 @@
 # exit on error
 set -e
 
-BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}"
-BUILD_TYPE="${BUILD_TYPE:-Release}"
+BUILD_TYPE="${BUILD_TYPE:-Release}" # build_type as used by cmake
+BUILD_PROFILE="${BUILD_PROFILE:-emscripten}" # emscripten or linux
+BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}" # project root dir
+
 BUILD_TYPE_LC="$(echo "$BUILD_TYPE" | tr '[:upper:]' '[:lower:]')"
-BUILD_DIR="${BUILD_DIR:-"cmake-build-$BUILD_TYPE_LC"}"
+BUILD_DIR="${BUILD_DIR:-"cmake-build-${BUILD_TYPE_LC}-${BUILD_PROFILE}"}"
 
-export CC=emcc
-export CXX=em++
-
-apt update
-apt install -vy libgl-dev
+if [ "$BUILD_PROFILE" == emscripten ]; then
+  CMAKE="emcmake cmake"
+else
+  CMAKE=cmake
+fi
 
 # check python, pip & cmake are installed
 python3 --version
 pip3 --version
-cmake --version
+${CMAKE} --version
 
 pip3 install -U -r "$BUILD_ROOT/ci/requirements.txt"
 
 conan profile detect || true
 
 CONAN_SETTINGS=(
-  -s os=Emscripten
-  -s arch=wasm
-  -s compiler=clang
-  -s compiler.version=17
-  -s compiler.libcxx=libc++
+  --profile="$BUILD_ROOT/ci/$BUILD_PROFILE/conan.profile"
   -s build_type="$BUILD_TYPE"
+  -c tools.cmake.cmake_layout:build_folder_vars="['settings.build_type', 'settings.os']"
+  -c tools.system.package_manager:mode=install
 )
 
-export CFLAGS=-msimd128
 cd "$BUILD_ROOT"
 conan install -of "$BUILD_DIR" --build=missing "${CONAN_SETTINGS[@]}" .
 
+source ${BUILD_DIR}/conanbuildenv-${BUILD_TYPE_LC}*.sh
+
 # configure build
 cd "$BUILD_DIR"
-cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW "-DCMAKE_BUILD_TYPE=$BUILD_TYPE"
+${CMAKE} .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX
 
 # put dependencies' dll's on LD_LIBRARY_PATH etc
 source conanrun.sh
