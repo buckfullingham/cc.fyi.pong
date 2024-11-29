@@ -2,8 +2,8 @@
 
 set -e
 
-BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}"
-BUILD_PROFILE="${BUILD_PROFILE:-emscripten}"
+export BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}"
+export BUILD_PROFILE="${BUILD_PROFILE:-emscripten}"
 
 test -d "$BUILD_ROOT"
 test -d "$BUILD_ROOT/ci/$BUILD_PROFILE"
