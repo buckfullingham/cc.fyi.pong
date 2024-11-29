@@ -11,13 +11,16 @@ test -d "$BUILD_ROOT/ci/$BUILD_PROFILE"
 apt update -vy
 apt install -vy docker
 
-docker build -t "$BUILD_PROFILE" "$BUILD_ROOT/ci/$BUILD_PROFILE"
+docker build \
+  -t "$BUILD_PROFILE" \
+  -f "$BUILD_ROOT/ci/$BUILD_PROFILE/Dockerfile" \
+  "$BUILD_ROOT/ci"
 
 exec docker run \
-  --interactive \
+  -i \
   -v "${BUILD_ROOT}:${BUILD_ROOT}" \
   -u 0 \
-  -e "BUILD_ROOT=${BUILD_ROOT}" \
-  -e "BUILD_PROFILE=${BUILD_PROFILE}" \
+  -e BUILD_ROOT \
+  -e BUILD_PROFILE \
   "$BUILD_PROFILE" \
   "$@"

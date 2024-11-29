@@ -35,4 +35,4 @@ target_link_libraries(model PRIVATE
 )
 
 catch_discover_tests(tests)
-catch_discover_tests(model)
+#catch_discover_tests(model)

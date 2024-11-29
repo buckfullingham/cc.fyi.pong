@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
-# exit on error
 set -e
 
-BUILD_TYPE="${BUILD_TYPE:-Release}" # build_type as used by cmake
-BUILD_PROFILE="${BUILD_PROFILE:-emscripten}" # emscripten or linux
-BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}" # project root dir
-
+BUILD_TYPE="${BUILD_TYPE:-Release}"
+BUILD_PROFILE="${BUILD_PROFILE:-emscripten}"
+BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}"
 BUILD_TYPE_LC="$(echo "$BUILD_TYPE" | tr '[:upper:]' '[:lower:]')"
 BUILD_DIR="${BUILD_DIR:-"cmake-build-${BUILD_TYPE_LC}-${BUILD_PROFILE}"}"
 
@@ -16,10 +14,9 @@ else
   CMAKE=cmake
 fi
 
-# check python, pip & cmake are installed
 python3 --version
 pip3 --version
-${CMAKE} --version
+$CMAKE --version
 
 pip3 install -U -r "$BUILD_ROOT/ci/requirements.txt"
 
@@ -37,9 +34,18 @@ conan install -of "$BUILD_DIR" --build=missing "${CONAN_SETTINGS[@]}" .
 
 source ${BUILD_DIR}/conanbuildenv-${BUILD_TYPE_LC}*.sh
 
+$CC --version
+$CXX --version
+
 # configure build
 cd "$BUILD_DIR"
-${CMAKE} .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX
+$CMAKE .. \
+  -G "Unix Makefiles" \
+  -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake \
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
+  -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+  -DCMAKE_C_COMPILER=$CC \
+  -DCMAKE_CXX_COMPILER=$CXX
 
 # put dependencies' dll's on LD_LIBRARY_PATH etc
 source conanrun.sh

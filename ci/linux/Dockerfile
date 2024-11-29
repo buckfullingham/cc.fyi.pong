@@ -1,16 +1,17 @@
 FROM ubuntu
 
-RUN apt -y update && apt -y upgrade
-
-RUN apt -y install \
+RUN apt -y update \
+ && apt -y upgrade \
+ && apt -y install \
     clang \
     cmake \
     python3-full \
     libgl-dev \
     pkg-config \
-    gdb
+    gdb \
+    g++
 
 RUN python3 -m venv /venv
 ENV PATH=$PATH:/venv/bin
-RUN pip3 install 'conan==2.*'
-RUN apt -y install g++
+COPY ../requirements.txt /tmp/
+RUN pip3 install -U -r /tmp/requirements.txt && rm /tmp/requirements.txt

@@ -1,6 +1,11 @@
 FROM emscripten/emsdk
 
-# RUN apt install -y python3-venv pkg-config libgl-dev libopengl-dev libglfw3-dev libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev
+RUN apt -y update \
+ && apt -y upgrade \
+ && apt -y install \
+    python3-venv
 
-RUN pip3 install 'conan==2.*'
-
+RUN python3 -m venv /venv
+ENV PATH=$PATH:/venv/bin
+COPY ../requirements.txt /tmp/
+RUN pip3 install -U -r /tmp/requirements.txt && rm /tmp/requirements.txt
