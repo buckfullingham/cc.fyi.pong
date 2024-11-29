@@ -26,7 +26,7 @@ jobs:
 
     - name: do build
       run: >
-        BUILD_TYPE={{matrix.build_type}}
-        BUILD_PROFILE={{matrix.build_profile}}
-        ${{github.workspace}}/ci/{{matrix.build_profile}}/container.sh
+        BUILD_TYPE=${{matrix.build_type}}
+        BUILD_PROFILE=${{matrix.build_profile}}
+        ${{github.workspace}}/ci/${{matrix.build_profile}}/container.sh
         ${{github.workspace}}/ci/build.sh
