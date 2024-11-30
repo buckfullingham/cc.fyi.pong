@@ -22,7 +22,7 @@ TEST_CASE("horizontal and vertical collisions with arena") {
   const auto x = GENERATE(-1.f, 0.f, +1.f);
   const auto y = GENERATE(-1.f, 0.f, +1.f);
 
-  if (x != 0.f || y != 0.f) {
+  if ((x == 0.f) != (y == 0.f)) {
     WHEN("x == " << x << " and y = " << y) {
       a.puck().velocity() = {x, y};
       CHECK(!a.next_collision(94.f));

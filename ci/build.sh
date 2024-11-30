@@ -40,9 +40,7 @@ $CMAKE .. \
   -G "Unix Makefiles" \
   -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
-  -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-  -DCMAKE_C_COMPILER=$CC \
-  -DCMAKE_CXX_COMPILER=$CXX
+  -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
 
 # put dependencies' dll's on LD_LIBRARY_PATH etc
 source conanrun.sh

@@ -64,6 +64,7 @@ inline ImU32 col(Eigen::Matrix<std::uint8_t, 4, 1> v) {
 
 // Main code
 int main(int, char **) {
+  std::cout << "starting..." << std::endl;
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit())
     return 1;

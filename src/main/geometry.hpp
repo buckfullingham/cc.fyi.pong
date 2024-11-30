@@ -2,23 +2,31 @@
 #define PONG_GEOMETRY_HPP
 
 #include <Eigen/Dense>
+#include <concepts>
 
 namespace pong {
 
-using plane_t = Eigen::Hyperplane<float, 2>;
-using line_t = Eigen::ParametrizedLine<float, 2>;
-using vec_t = Eigen::Vector2f;
-using box_t = Eigen::AlignedBox<float, 2>;
-using matrix_t = Eigen::Matrix2f;
+using scalar_t = float;
+
+using vec_t = Eigen::Vector<scalar_t, 2>;
+using matrix_t = Eigen::Matrix<scalar_t, 2, 2>;
+using plane_t = Eigen::Hyperplane<scalar_t, 2>;
+using line_t = Eigen::ParametrizedLine<scalar_t, 2>;
+using box_t = Eigen::AlignedBox<scalar_t, 2>;
 
 namespace unit {
-const vec_t i = {1.f, 0.f};
-const vec_t j = {0.f, 1.f};
+const vec_t i = {scalar_t{1}, scalar_t{0}};
+const vec_t j = {scalar_t{0}, scalar_t{1}};
+
 } // namespace unit
 
-const auto flip_x = matrix_t{{-1.f, 0.f}, {0.f, 1.f}};
-const auto flip_y = matrix_t{{1.f, 0.f}, {0.f, -1.f}};
+namespace transform {
+const auto flip_x = matrix_t{{scalar_t{-1}, scalar_t{0}}, {scalar_t{0}, scalar_t{1}}};
+const auto flip_y = matrix_t{{scalar_t{1}, scalar_t{0}}, {scalar_t{0}, scalar_t{-1}}};
+}
 
 } // namespace pong
+
+static_assert(std::is_signed_v<pong::scalar_t>);
 
 #endif // PONG_GEOMETRY_HPP

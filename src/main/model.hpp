@@ -27,15 +27,15 @@ class arena_t;
 using colour_t = Eigen::Matrix<std::uint8_t, 4, 1>;
 
 class circle_t {
-  MEMBER_GETTER_SETTER(Eigen::Vector2f, centre);
-  MEMBER_GETTER_SETTER(Eigen::Vector2f, velocity);
-  MEMBER_GETTER_SETTER(float, radius);
+  MEMBER_GETTER_SETTER(vec_t, centre);
+  MEMBER_GETTER_SETTER(vec_t, velocity);
+  MEMBER_GETTER_SETTER(scalar_t, radius);
   MEMBER_GETTER_SETTER(colour_t, colour);
 };
 
 class rectangle_t {
-  MEMBER_GETTER_SETTER(Eigen::AlignedBox2f, box);
-  MEMBER_GETTER_SETTER(Eigen::Vector2f, velocity);
+  MEMBER_GETTER_SETTER(box_t, box);
+  MEMBER_GETTER_SETTER(vec_t, velocity);
   MEMBER_GETTER_SETTER(colour_t, colour);
 };
 
@@ -54,146 +54,146 @@ class arena_t : public rectangle_t {
   MEMBER_GETTER_SETTER(std::uint32_t, lhs_score);
   MEMBER_GETTER_SETTER(std::uint32_t, rhs_score);
 
-  template <std::floating_point F> static bool is_approx(F lhs, F rhs) {
-    return std::abs(lhs - rhs) < .5f;
-  }
-
 public:
   void init() {
-    vec_t top_left{10.f, 10.f};
-    vec_t size{620.f, 460.f};
+    vec_t top_left{10, 10};
+    vec_t size{620, 460};
     box() = {top_left, top_left + size};
-    puck().radius() = 5.f;
-    puck().centre() = {320.f, 240.f};
-    puck().velocity() = {197.f, 87.f};
+    puck().radius() = 5;
+    puck().centre() = {320, 240};
+    puck().velocity() = {197, 87};
     puck().colour() = {UINT8_C(0), UINT8_C(255), UINT8_C(0), UINT8_C(255)};
-    lhs_paddle().box() = {vec_t{18.f, 220.f}, vec_t{22.f, 260.f}};
-    lhs_paddle().velocity() = {0.f, 0.f};
+    lhs_paddle().box() = {vec_t{18, 220}, vec_t{22, 260}};
+    lhs_paddle().velocity() = {0, 0};
     lhs_paddle().colour() = {UINT8_C(0), UINT8_C(0), UINT8_C(255),
                              UINT8_C(255)};
-    rhs_paddle().box() = {vec_t{618.f, 220.f}, vec_t{622.f, 260.f}};
-    rhs_paddle().velocity() = {0.f, 0.f};
+    rhs_paddle().box() = {vec_t{618, 220}, vec_t{622, 260}};
+    rhs_paddle().velocity() = {0, 0};
     rhs_paddle().colour() = {UINT8_C(255), UINT8_C(0), UINT8_C(0),
                              UINT8_C(255)};
   }
 
-  [[nodiscard]] std::optional<std::tuple<vec_t, matrix_t, float>>
-  next_collision(const float dt) const {
-    using namespace unit;
+  /**
+   * @arg dt the time period over which to search for the next collision
+   * @return optional tuple of:
+   * 0: where the centre of the puck is at the next collision
+   * 1: the transformation to apply to the puck velocity at the next collision
+   * 2: (0 <= when <= dt) the next collision occurs
+   */
+  [[nodiscard]] std::optional<std::tuple<vec_t, matrix_t, scalar_t>>
+  next_collision(const scalar_t dt) const {
+    assert(!puck().velocity().isZero());
 
-    // only call this when the puck is moving
-    assert(puck().velocity().norm() != 0.f);
+    const line_t trajectory{puck().centre(), puck().velocity()};
 
-    std::optional<std::tuple<vec_t, matrix_t, float>> result{};
-
-    // add (or subtract) a border around a box to account for puck radius when
-    // calculating collisions: positive r means a bigger box
-    const auto adjust = [](box_t result, float r) {
-      result.min() -= vec_t{r, r};
-      result.max() += vec_t{r, r};
+    // enlarge (shrink) a box
+    auto enlarge = [](box_t result, const scalar_t adjustment) {
+      const vec_t v{adjustment, adjustment};
+      result.min() -= v;
+      result.max() += v;
       return result;
     };
 
-    const auto adjusted_box = adjust(box(), -puck().radius());
-    const auto adjusted_lhs_paddle = adjust(lhs_paddle().box(), puck().radius());
-    const auto adjusted_rhs_paddle = adjust(rhs_paddle().box(), puck().radius());
+    const box_t box = enlarge(this->box(), -puck().radius());
+    const box_t lhs = enlarge(lhs_paddle().box(), puck().radius());
+    const box_t rhs = enlarge(rhs_paddle().box(), puck().radius());
 
-    // there are no walls to collide with in the empty box
-    auto empty_box = adjust(box_t{
-        vec_t{adjusted_lhs_paddle.max()(0), adjusted_box.min()(1)},
-        vec_t{adjusted_rhs_paddle.min()(0), adjusted_box.max()(1)},
-    }, -1.f);
+    assert(enlarge(box, 1).contains(puck().centre()));
+    assert(!enlarge(lhs, -1).contains(puck().centre()));
+    assert(!enlarge(rhs, -1).contains(puck().centre()));
 
-    assert(adjusted_box.contains(empty_box));
-    assert(!empty_box.contains(adjusted_lhs_paddle));
-    assert(!empty_box.contains(adjusted_rhs_paddle));
-    assert(!empty_box.intersects(adjusted_lhs_paddle));
-    assert(!empty_box.intersects(adjusted_rhs_paddle));
+    // a box within which there are no planes to collide with
+    auto empty_box = [&]() {
+      vec_t min{lhs.max()(0), box.min()(1)};
+      vec_t max{rhs.min()(0), box.max()(1)};
+      return enlarge(box_t{min, max}, -1);
+    }();
 
-    // if the trajectory is contained within the empty box, there was no
-    // collision in dt
-    if (empty_box.contains(puck().centre()) &&
-        empty_box.contains(puck().centre() + puck().velocity() * dt)) {
+    if (empty_box.contains(trajectory.pointAt(0.f)) &&
+        empty_box.contains(trajectory.pointAt(dt))) {
       return {};
     }
 
-    // boxes that the puck can collide with (arena, paddle), adjusted to take
-    // into account the puck's radius
-    const std::array boxes{
-        adjusted_box,
-        adjusted_lhs_paddle,
-        adjusted_rhs_paddle,
-    };
+    std::optional<std::tuple<vec_t, matrix_t, scalar_t>> result;
 
-    // a parametrized line describing the puck's trajectory
-    const line_t trajectory{puck().centre(), puck().velocity().normalized()};
-
-    for (auto &b : boxes) {
-      // the planes representing the sides of the box in question and the
-      // transformation that occurs upon collision with the plane
-      auto plane_and_transform = [](auto &p0, auto &p1, auto &t) {
-        return std::tuple<plane_t, matrix_t>(plane_t::Through(p0, p1), t);
-      };
-
+    for (const auto &b : {box, lhs, rhs}) {
       const std::array planes_and_transforms{
-          plane_and_transform(b.min(), b.min() + i, flip_y),
-          plane_and_transform(b.min(), b.min() + j, flip_x),
-          plane_and_transform(b.max(), b.max() + i, flip_y),
-          plane_and_transform(b.max(), b.max() + j, flip_x),
+          std::make_tuple(plane_t::Through(b.min(), b.min() + unit::i),
+                          transform::flip_y),
+          std::make_tuple(plane_t::Through(b.min(), b.min() + unit::j),
+                          transform::flip_x),
+          std::make_tuple(plane_t::Through(b.max(), b.max() + unit::i),
+                          transform::flip_y),
+          std::make_tuple(plane_t::Through(b.max(), b.max() + unit::j),
+                          transform::flip_x),
       };
 
-      for (auto &[plane, transform] : planes_and_transforms) {
-        // where on trajectory collision occurs
+      for (const auto &[plane, transform] : planes_and_transforms) {
+        const auto when = trajectory.intersectionParameter(plane);
         const auto where = trajectory.intersectionPoint(plane);
-        // when it occurs
-        const auto when =
-            trajectory.intersectionParameter(plane) / puck().velocity().norm();
-        // must happen within the box (ie on one of its sides), not before time
-        // -0f and not after time dt
-        if (!b.contains(where) || when > dt || when < -0.f)
+
+        // collides never, in the past or in the future
+        if (when != when || when < -0.f || when > dt)
           continue;
-        // if this is the first collision we've found, or it happens before any
-        // other collision we already found, make this collision the result
-        if (!result || when < std::get<2>(*result))
-          result = {where, transform, when};
+
+        // isn't within the box's bounds
+        if (!b.contains(where))
+          continue;
+
+        if (!result) {
+          result.emplace(where, transform, when);
+          continue;
+        }
+
+        const auto last_when = std::get<2>(*result);
+
+        if (when < last_when) { // this collision is earlier than the last
+          result.emplace(where, transform, when);
+        } else if (when == last_when) { // concurrent collisions
+          result.emplace(where, transform * std::get<1>(*result), when);
+        }
       }
     }
 
+    assert(!result || box.contains(std::get<0>(*result)));
+    assert(!result || std::get<2>(*result) >= -0.f);
     assert(!result || std::get<2>(*result) <= dt);
+
     return result;
   }
 
-  void advance_time(float dt) {
+  void advance_time(scalar_t dt) {
     // first move the paddle within its bounds according to its velocity
     auto move_paddle = [&](paddle_t &p) {
       if (p.velocity().isZero())
         return;
       p.box().translate(p.velocity() * dt);
       if (p.box().min()(1) < box().min()(1)) {
-        p.box().translate(vec_t{0.f, box().min()(1) - p.box().min()(1) + 1.f});
-        p.velocity() = {0.f, 0.f};
+        p.box().translate(vec_t{0, box().min()(1) - p.box().min()(1) + 1});
+        p.velocity() = {0, 0};
       }
       if (p.box().max()(1) > box().max()(1)) {
-        p.box().translate(vec_t{0.f, box().max()(1) - p.box().max()(1) - 1.f});
-        p.velocity() = {0.f, 0.f};
+        p.box().translate(vec_t{0, box().max()(1) - p.box().max()(1) - 1});
+        p.velocity() = {0, 0};
       }
     };
     move_paddle(lhs_paddle());
     move_paddle(rhs_paddle());
 
     // now perform collisions for dt time
-    while (dt > 0.f) {
+    while (dt > 0) {
       if (auto collision = next_collision(dt)) {
         auto &[where, transformation, when] = *collision;
         // if we arrive at exactly the time of a collision then we can end up
         // in an infinite loop; avoid this by ensuring we always increment time
         // some small amount whenever there is a collision
-        dt -= when;
-        puck().centre() = where;
+        constexpr auto time_incr = float(1/1000.f);
         puck().velocity() = transformation * puck().velocity();
+        puck().centre() = where + puck().velocity() * time_incr;
+        dt -= when + time_incr;
       } else {
         puck().centre() += puck().velocity() * dt;
-        dt = 0.f;
+        dt = 0;
       }
     }
   }
