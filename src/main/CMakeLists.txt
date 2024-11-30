@@ -1,7 +1,6 @@
 find_package(imgui REQUIRED)
 find_package(opengl_system REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(glfw3 REQUIRED)
 
 add_library(
         imgui-backend OBJECT
@@ -13,7 +12,6 @@ target_link_libraries(
         imgui-backend PUBLIC
         imgui::imgui
         opengl::opengl
-        #        glfw
 )
 
 target_compile_options(
