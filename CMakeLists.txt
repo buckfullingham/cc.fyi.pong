@@ -14,10 +14,17 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 
-if (EMSCRIPTEN)
-    add_compile_options(-fwasm-exceptions -sASSERTIONS)
-    add_link_options(-fwasm-exceptions -sASSERTIONS)
-endif()
+# conan / emscripten incompatibiit : they both use cmake toolchain files
+# so we need to provice our own method of distinguishing between emscripten
+# and linux builds, for which we use the BUILD_PROFILE variable
+add_compile_options(
+        "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-fwasm-exceptions>"
+)
+
+add_link_options(
+        "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-fwasm-exceptions>"
+        "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-sASSERTIONS>"
+)
 
 enable_testing()
 add_subdirectory(src)
