@@ -51,3 +51,6 @@ cmake --build . --parallel
 
 # run tests
 ctest .
+
+cpack -G TGZ .
+tar xvzf *.gz

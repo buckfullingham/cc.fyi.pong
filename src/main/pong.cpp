@@ -136,7 +136,7 @@ int main(int, char **) {
 
   pong::arena_t arena;
   arena.init();
-  arena.puck().velocity() = {200.f, -100.f};
+  arena.puck().velocity() = {400.f, -200.f};
 
   // Main loop
 #ifdef __EMSCRIPTEN__

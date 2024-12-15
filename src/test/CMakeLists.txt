@@ -18,11 +18,11 @@ target_include_directories(test-lib INTERFACE
         ../main
 )
 
-add_executable(tests
-        tests.cpp
+add_executable(geometry
+        geometry.cpp
 )
 
-target_link_libraries(tests PRIVATE
+target_link_libraries(geometry PRIVATE
         test-lib
 )
 
@@ -34,5 +34,13 @@ target_link_libraries(model PRIVATE
         test-lib
 )
 
-catch_discover_tests(tests)
+add_executable(tests
+        tests.cpp
+)
+
+target_link_libraries(tests PRIVATE
+        test-lib
+)
+
 catch_discover_tests(model)
+catch_discover_tests(tests)

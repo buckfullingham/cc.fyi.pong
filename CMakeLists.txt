@@ -28,3 +28,4 @@ add_link_options(
 
 enable_testing()
 add_subdirectory(src)
+include(CPack)
