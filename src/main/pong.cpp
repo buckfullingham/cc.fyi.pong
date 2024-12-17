@@ -134,9 +134,18 @@ int main(int, char **) {
   // Our state
   ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-  pong::arena_t arena;
+  pong::arena_t arena{
+      [prng = std::mt19937{std::random_device{}()},
+       s_dist = std::uniform_int_distribution<int>{0, 1},
+       x_dist = std::uniform_real_distribution<float>(300., 400.),
+       y_dist = std::uniform_real_distribution<float>{100., 200.}]() mutable {
+        const auto x = x_dist(prng);
+        const auto y = y_dist(prng);
+        const auto x_sign = pong::scalar_t(s_dist(prng) * 2 - 1);
+        const auto y_sign = pong::scalar_t(s_dist(prng) * 2 - 1);
+        return pong::vec_t{x_sign * x, y_sign * y};
+      }};
   arena.init();
-  arena.puck().velocity() = {400.f, -200.f};
 
   // Main loop
 #ifdef __EMSCRIPTEN__

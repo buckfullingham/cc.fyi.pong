@@ -61,14 +61,20 @@ class arena_t : public rectangle_t {
   MEMBER_GETTER_SETTER(std::uint32_t, lhs_score);
   MEMBER_GETTER_SETTER(std::uint32_t, rhs_score);
 
+private:
+  std::function<vec_t()> next_puck_velocity_;
+
 public:
+  explicit arena_t(std::function<vec_t()> next_puck_velocity)
+      : next_puck_velocity_(std::move(next_puck_velocity)) {}
+
   void init() {
     vec_t top_left{10, 10};
     vec_t size{620, 460};
     box() = {top_left, top_left + size};
     puck().radius() = 5;
     puck().centre() = {320, 240};
-    puck().velocity() = {197, 87};
+    puck().velocity() = next_puck_velocity_();
     puck().colour() = {UINT8_C(0), UINT8_C(255), UINT8_C(0), UINT8_C(255)};
     lhs_paddle().box() = {vec_t{18, 220}, vec_t{22, 260}};
     lhs_paddle().velocity() = {0, 0};
@@ -80,6 +86,64 @@ public:
                              UINT8_C(255)};
   }
 
+  void restart_puck() {
+    puck().centre() = vec_t{320, 240};
+    puck().velocity() = next_puck_velocity_();
+  }
+
+  void on_lhs_goal() {
+    ++rhs_score();
+    restart_puck();
+  }
+
+  void on_rhs_goal() {
+    ++lhs_score();
+    restart_puck();
+  }
+
+  void reflect(const vec_t &normal) {
+    puck().velocity() =
+        puck().velocity() - 2 * puck().velocity().dot(normal) * normal;
+  }
+
+  [[nodiscard]] std::optional<std::tuple<scalar_t, std::function<void()>>>
+  next_collision_with_arena(const scalar_t dt) {
+    std::optional<std::tuple<scalar_t, std::function<void()>>> result{};
+
+    const line_t trajectory{puck().centre(), puck().velocity()};
+    const box_t box = bordered(this->box(), -puck().radius());
+
+    using TT = std::tuple<plane_t, vec_t, std::function<void()>>;
+
+    std::array<TT, 12> planes_and_normals{
+        TT{plane_t::Through(box.min(), box.min() + unit::i), unit::j,
+           [this]() { reflect(unit::j); }},
+        TT{plane_t::Through(box.min(), box.min() + unit::j), unit::i,
+           [this]() { on_lhs_goal(); }},
+        TT{plane_t::Through(box.max(), box.max() + unit::i), -unit::j,
+           [this]() { reflect(-unit::j); }},
+        TT{plane_t::Through(box.max(), box.max() + unit::j), -unit::i,
+           [this]() { on_rhs_goal(); }},
+    };
+
+    for (auto &[plane, normal, action] : planes_and_normals) {
+      if (trajectory.direction().dot(normal) >= -0.f)
+        continue;
+
+      auto when = trajectory.intersectionParameter(plane);
+
+      if (when != when || when < -0.f || when > dt)
+        continue;
+
+      if (result && when >= std::get<0>(*result))
+        continue;
+
+      result.emplace(when, std::move(action));
+    }
+
+    return result;
+  }
+
   /**
    * @arg dt the time period over which to search for the next collision
    * @return optional tuple of:
@@ -87,8 +151,8 @@ public:
    * 1: the transformation to apply to the puck velocity at the next collision
    * 2: (0 <= when <= dt) the next collision occurs
    */
-  [[nodiscard]] std::optional<std::tuple<vec_t, vec_t, scalar_t>>
-  next_collision(const scalar_t dt) const {
+  [[nodiscard]] std::optional<std::tuple<scalar_t, std::function<void()>>>
+  next_collision(const scalar_t dt) {
     assert(!puck().velocity().isZero());
 
     const line_t trajectory{puck().centre(), puck().velocity()};
@@ -117,15 +181,11 @@ public:
       return {};
     }
 
-    std::optional<std::tuple<vec_t, vec_t, scalar_t>> result;
+    std::optional<std::tuple<scalar_t, std::function<void()>>> result;
+    result = next_collision_with_arena(dt);
 
     using TT = std::tuple<box_t, plane_t, vec_t>;
     const std::array<TT, 12> planes_and_normals{
-        TT{box, plane_t::Through(box.min(), box.min() + unit::i), unit::j},
-        TT{box, plane_t::Through(box.min(), box.min() + unit::j), unit::i},
-        TT{box, plane_t::Through(box.max(), box.max() + unit::i), -unit::j},
-        TT{box, plane_t::Through(box.max(), box.max() + unit::j), -unit::i},
-
         TT{lhs, plane_t::Through(lhs.min(), lhs.min() + unit::i), -unit::j},
         TT{lhs, plane_t::Through(lhs.min(), lhs.min() + unit::j), -unit::i},
         TT{lhs, plane_t::Through(lhs.max(), lhs.max() + unit::i), unit::j},
@@ -158,19 +218,18 @@ public:
 
       // first collision found; record it
       if (!result) {
-        result.emplace(where, normal, when);
+        result.emplace(when, [=, this]() { reflect(normal); });
         continue;
       }
 
-      const auto last_when = std::get<2>(*result);
+      const auto last_when = std::get<0>(*result);
 
       // subsequent collision found; record if earlier than the earliest found
       // so far
       if (when < last_when) {
-        result.emplace(where, normal, when);
+        result.emplace(when, [=, this]() { reflect(normal); });
       } else if (when == last_when) {
-        result.emplace(where, (normal + std::get<1>(*result)).normalized(),
-                       when);
+        assert(false); // FIXME
       }
     }
 
@@ -204,10 +263,9 @@ public:
     while (dt > 0) {
       //      std::cout << "dt = " << dt << "\n";
       if (auto collision = next_collision(dt)) {
-        auto &[where, normal, when] = *collision;
-        puck().velocity() =
-            puck().velocity() - 2 * puck().velocity().dot(normal) * normal;
-        puck().centre() = where;
+        auto &[when, action] = *collision;
+        puck().centre() = puck().centre() + puck().velocity() * when;
+        action();
         dt -= when;
       } else {
         puck().centre() += puck().velocity() * dt;
