@@ -115,7 +115,7 @@ public:
 
     using TT = std::tuple<plane_t, vec_t, std::function<void()>>;
 
-    std::array<TT, 12> planes_and_normals{
+    std::array planes_and_normals{
         TT{plane_t::Through(box.min(), box.min() + unit::i), unit::j,
            [this]() { reflect(unit::j); }},
         TT{plane_t::Through(box.min(), box.min() + unit::j), unit::i,
@@ -130,13 +130,15 @@ public:
       if (trajectory.direction().dot(normal) >= -0.f)
         continue;
 
-      auto when = trajectory.intersectionParameter(plane);
+      const auto when = trajectory.intersectionParameter(plane);
 
       if (when != when || when < -0.f || when > dt)
         continue;
 
       if (result && when >= std::get<0>(*result))
         continue;
+
+      assert(!result || when != std::get<0>(*result)); // FIXME
 
       result.emplace(when, std::move(action));
     }
@@ -155,37 +157,17 @@ public:
   next_collision(const scalar_t dt) {
     assert(!puck().velocity().isZero());
 
-    const line_t trajectory{puck().centre(), puck().velocity()};
+    std::optional<std::tuple<scalar_t, std::function<void()>>> result =
+        next_collision_with_arena(dt);
 
-    const box_t box = bordered(this->box(), -puck().radius());
+    const line_t trajectory{puck().centre(), puck().velocity()};
     const box_t lhs = bordered(lhs_paddle().box(), puck().radius());
     const box_t rhs = bordered(rhs_paddle().box(), puck().radius());
-
-    if (!bordered(box, 1).contains(puck().centre())) {
-      return {};
-    }
-
-    assert(bordered(box, 1).contains(puck().centre()));
     assert(!bordered(lhs, -1).contains(puck().centre()));
     assert(!bordered(rhs, -1).contains(puck().centre()));
 
-    // a box within which there are no planes to collide with
-    auto empty_box = [&]() {
-      vec_t min{lhs.max()(0), box.min()(1)};
-      vec_t max{rhs.min()(0), box.max()(1)};
-      return bordered(box_t{min, max}, -1);
-    }();
-
-    if (empty_box.contains(trajectory.pointAt(0.f)) &&
-        empty_box.contains(trajectory.pointAt(dt))) {
-      return {};
-    }
-
-    std::optional<std::tuple<scalar_t, std::function<void()>>> result;
-    result = next_collision_with_arena(dt);
-
     using TT = std::tuple<box_t, plane_t, vec_t>;
-    const std::array<TT, 12> planes_and_normals{
+    const std::array planes_and_normals{
         TT{lhs, plane_t::Through(lhs.min(), lhs.min() + unit::i), -unit::j},
         TT{lhs, plane_t::Through(lhs.min(), lhs.min() + unit::j), -unit::i},
         TT{lhs, plane_t::Through(lhs.max(), lhs.max() + unit::i), unit::j},
@@ -198,45 +180,26 @@ public:
     };
 
     for (const auto &[b, plane, normal] : planes_and_normals) {
-      // points in the wrong direction
       if (trajectory.direction().dot(normal) >= -0.f)
         continue;
 
       const auto when = trajectory.intersectionParameter(plane);
 
-      // collides never, in the past or in the future
       if (when != when || when < -0.f || when > dt)
         continue;
 
-      // FIXME can end up beyond the plane
+      if (result && when >= std::get<0>(*result))
+        continue;
+
+      assert(!result || when != std::get<0>(*result)); // FIXME
+
       const auto where = trajectory.intersectionPoint(plane);
 
-      // isn't within the box's bounds
-      // FIXME can end up outside the arena box, check only non-plane extremes?
       if (!b.contains(vec_t{std::round(where(0)), std::round(where(1))}))
         continue;
 
-      // first collision found; record it
-      if (!result) {
-        result.emplace(when, [=, this]() { reflect(normal); });
-        continue;
-      }
-
-      const auto last_when = std::get<0>(*result);
-
-      // subsequent collision found; record if earlier than the earliest found
-      // so far
-      if (when < last_when) {
-        result.emplace(when, [=, this]() { reflect(normal); });
-      } else if (when == last_when) {
-        assert(false); // FIXME
-      }
+      result.emplace(when, [=, this]() { reflect(normal); });
     }
-
-    // FIXME
-    //    assert(!result || box.contains(std::get<0>(*result)));
-    //    assert(!result || std::get<2>(*result) >= -0.f);
-    //    assert(!result || std::get<2>(*result) <= dt);
 
     return result;
   }
@@ -261,7 +224,6 @@ public:
 
     // now perform collisions for dt time
     while (dt > 0) {
-      //      std::cout << "dt = " << dt << "\n";
       if (auto collision = next_collision(dt)) {
         auto &[when, action] = *collision;
         puck().centre() = puck().centre() + puck().velocity() * when;
