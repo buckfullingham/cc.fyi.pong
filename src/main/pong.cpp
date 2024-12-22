@@ -145,7 +145,6 @@ int main(int, char **) {
         const auto y_sign = pong::scalar_t(s_dist(prng) * 2 - 1);
         return pong::vec_t{x_sign * x, y_sign * y};
       }};
-  arena.init();
 
   // Main loop
 #ifdef __EMSCRIPTEN__

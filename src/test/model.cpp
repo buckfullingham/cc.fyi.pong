@@ -19,50 +19,12 @@ std::function<p::vec_t()> make_starter() {
 }
 
 } // namespace
-#if 0
-TEST_CASE("horizontal and vertical collisions with arena") {
-  p::arena_t a;
-  using p::box_t;
-  using p::vec_t;
-  a.box().min() = vec_t{-100.f, -100.f};
-  a.box().max() = vec_t{100.f, 100.f};
-  a.puck().centre() = vec_t{0.f, 0.f};
-  a.puck().radius() = 5.f;
-
-  // place paddles out of the way
-  a.lhs_paddle().box() = box_t{vec_t{0.f, 0.f}, vec_t{1.f, 1.f}}.translated(
-      a.box().min() + vec_t{25.f, 10.f});
-  a.rhs_paddle().box() = box_t{vec_t{0.f, 0.f}, vec_t{1.f, 1.f}}.translated(
-      a.box().max() - vec_t{25.f, 10.f});
-
-  const auto x = GENERATE(-1.f, 0.f, +1.f);
-  const auto y = GENERATE(-1.f, 0.f, +1.f);
-
-  if ((x == 0.f) != (y == 0.f)) {
-    WHEN("x == " << x << " and y = " << y) {
-      a.puck().velocity() = {x, y};
-      CHECK(!a.next_collision(94.f));
-      auto collision = a.next_collision(96.f);
-      REQUIRE(!!collision);
-      //      CHECK(std::get<0>(*collision).isApprox(95.f *
-      //      a.puck().velocity()));
-    }
-  }
-}
-#endif
 
 TEST_CASE("advance time through a horizontal collision with a paddle") {
   p::arena_t a{make_starter()};
-  a.box().min() = {-100.f, -100.f};
-  a.box().max() = {100.f, 100.f};
-  a.puck().centre() = {0.f, 0.f};
-  a.puck().radius() = 5.f;
   a.puck().velocity() = {1.f, 0.f};
-  a.lhs_paddle().box().min() = {10.f, 10.f};
-  a.lhs_paddle().box().max() = {11.f, 11.f};
-  a.rhs_paddle().box().min() = {50.f, -50.f};
-  a.rhs_paddle().box().max() = {60.f, 50.f};
-  a.advance_time(44.f);
+  a.advance_time(a.rhs_paddle().box().min()(0) - a.puck().radius() -
+                 a.puck().centre()(0) - 1.f);
   CHECK(a.puck().velocity() == p::vec_t{1.f, 0.f});
   a.advance_time(2.f);
   CHECK(a.puck().velocity().isApprox(p::vec_t{-1.f, 0.f}));
@@ -82,7 +44,6 @@ TEST_CASE("ensure puck doesn't break through walls") {
                                60.f)]() mutable { return dist(prng); };
 
   p::arena_t a{make_starter()};
-  a.init();
 
   const p::vec_t adjustment{a.puck().radius(), a.puck().radius()};
 
@@ -146,7 +107,6 @@ TEST_CASE("ensure puck doesn't break through walls") {
 TEST_CASE("known breakout cases") {
   // known bug in an earlier version relating to a collision at -0 time
   p::arena_t a{make_starter()};
-  a.init();
 
   // clang-format off
   using test_t = std::tuple<p::scalar_t , std::array<unsigned char, 16>>;

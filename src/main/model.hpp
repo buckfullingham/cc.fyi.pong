@@ -31,19 +31,24 @@ class circle_t {
   MEMBER_GETTER_SETTER(vec_t, velocity);
   MEMBER_GETTER_SETTER(scalar_t, radius);
   MEMBER_GETTER_SETTER(colour_t, colour);
-};
 
-class wall_t {
-  MEMBER_GETTER_SETTER(vec_t, origin);
-  MEMBER_GETTER_SETTER(vec_t, diagonal);
-  MEMBER_GETTER_SETTER(vec_t, velocity);
-  MEMBER_GETTER_SETTER(vec_t, normal);
+public:
+  circle_t() = default;
+  circle_t(const vec_t &centre, const vec_t &velocity, const scalar_t radius,
+           const colour_t &colour)
+      : centre_(centre), velocity_(velocity), radius_(radius), colour_(colour) {
+  }
 };
 
 class rectangle_t {
   MEMBER_GETTER_SETTER(box_t, box);
   MEMBER_GETTER_SETTER(vec_t, velocity);
   MEMBER_GETTER_SETTER(colour_t, colour);
+
+public:
+  rectangle_t() = default;
+  rectangle_t(const box_t &box, vec_t velocity, colour_t colour)
+      : box_(box), velocity_(std::move(velocity)), colour_(std::move(colour)) {}
 };
 
 class puck_t : public circle_t {
@@ -55,6 +60,9 @@ class paddle_t : public rectangle_t {
 };
 
 class arena_t : public rectangle_t {
+
+  std::function<vec_t()> next_puck_velocity_;
+
   MEMBER_GETTER_SETTER(puck_t, puck);
   MEMBER_GETTER_SETTER(paddle_t, lhs_paddle);
   MEMBER_GETTER_SETTER(paddle_t, rhs_paddle);
@@ -62,29 +70,52 @@ class arena_t : public rectangle_t {
   MEMBER_GETTER_SETTER(std::uint32_t, rhs_score);
 
 private:
-  std::function<vec_t()> next_puck_velocity_;
+  using arena_surface_t = std::tuple<plane_t, vec_t, std::function<void()>>;
+  std::array<arena_surface_t, 4> arena_surfaces_;
 
 public:
   explicit arena_t(std::function<vec_t()> next_puck_velocity)
-      : next_puck_velocity_(std::move(next_puck_velocity)) {}
-
-  void init() {
-    vec_t top_left{10, 10};
-    vec_t size{620, 460};
-    box() = {top_left, top_left + size};
-    puck().radius() = 5;
-    puck().centre() = {320, 240};
-    puck().velocity() = next_puck_velocity_();
-    puck().colour() = {UINT8_C(0), UINT8_C(255), UINT8_C(0), UINT8_C(255)};
-    lhs_paddle().box() = {vec_t{18, 220}, vec_t{22, 260}};
-    lhs_paddle().velocity() = {0, 0};
-    lhs_paddle().colour() = {UINT8_C(0), UINT8_C(0), UINT8_C(255),
-                             UINT8_C(255)};
-    rhs_paddle().box() = {vec_t{618, 220}, vec_t{622, 260}};
-    rhs_paddle().velocity() = {0, 0};
-    rhs_paddle().colour() = {UINT8_C(255), UINT8_C(0), UINT8_C(0),
-                             UINT8_C(255)};
-  }
+      : rectangle_t{box_t{vec_t{10, 10}, vec_t{630, 470}}, vec_t{0, 0},
+                    colour_t{0, 0, 0, 0}},
+        next_puck_velocity_{std::move(next_puck_velocity)},
+        puck_{
+            vec_t{320, 240},
+            next_puck_velocity_(),
+            5,
+            colour_t{0, 255, 0, 255},
+        },
+        lhs_paddle_{
+            box_t{vec_t{18, 220}, vec_t{22, 260}},
+            vec_t{0, 0},
+            colour_t{0, 0, 255, 255},
+        },
+        rhs_paddle_{
+            box_t{vec_t{618, 220}, vec_t{622, 260}},
+            vec_t{0, 0},
+            colour_t{255, 0, 0, 255},
+        },
+        arena_surfaces_{
+            arena_surface_t{
+                plane_t::Through(bordered(box(), -puck().radius()).min(),
+                                 bordered(box(), -puck().radius()).min() +
+                                     unit::i),
+                unit::j, [this]() { reflect(unit::j); }},
+            arena_surface_t{
+                plane_t::Through(bordered(box(), -puck().radius()).max(),
+                                 bordered(box(), -puck().radius()).max() +
+                                     unit::i),
+                -unit::j, [this]() { reflect(-unit::j); }},
+            arena_surface_t{
+                plane_t::Through(bordered(box(), -puck().radius()).min(),
+                                 bordered(box(), -puck().radius()).min() +
+                                     unit::j),
+                unit::i, [this]() { on_lhs_goal(); }},
+            arena_surface_t{
+                plane_t::Through(bordered(box(), -puck().radius()).max(),
+                                 bordered(box(), -puck().radius()).max() +
+                                     unit::j),
+                -unit::i, [this]() { on_rhs_goal(); }},
+        } {}
 
   void restart_puck() {
     puck().centre() = vec_t{320, 240};
@@ -108,39 +139,51 @@ public:
 
   [[nodiscard]] std::optional<std::tuple<scalar_t, std::function<void()>>>
   next_collision_with_arena(const scalar_t dt) {
+    // Arena is made up of surfaces with inward facing normals.  The puck is
+    // within the arena so will always be facing at least one of these normals
+    // (meaning it has a negative dot product with the normal).  Furthermore, it
+    // will collide with the same surface(s) in the future since we know it's
+    // inside the arena.
+    //
+    //    +---------------+---------------+   Here P faces the top and rhs
+    //    |         ^     |               |   surfaces.
+    //    |        /      v               |
+    //    +-->    P                    <--+   Of those two surfaces, the top
+    //    |               ^               |   surface will be hit first.
+    //    |               |               |
+    //    +---------------+---------------+
+    //
     std::optional<std::tuple<scalar_t, std::function<void()>>> result{};
 
     const line_t trajectory{puck().centre(), puck().velocity()};
     const box_t box = bordered(this->box(), -puck().radius());
 
-    using TT = std::tuple<plane_t, vec_t, std::function<void()>>;
-
-    std::array planes_and_normals{
-        TT{plane_t::Through(box.min(), box.min() + unit::i), unit::j,
-           [this]() { reflect(unit::j); }},
-        TT{plane_t::Through(box.min(), box.min() + unit::j), unit::i,
-           [this]() { on_lhs_goal(); }},
-        TT{plane_t::Through(box.max(), box.max() + unit::i), -unit::j,
-           [this]() { reflect(-unit::j); }},
-        TT{plane_t::Through(box.max(), box.max() + unit::j), -unit::i,
-           [this]() { on_rhs_goal(); }},
-    };
-
-    for (auto &[plane, normal, action] : planes_and_normals) {
+    for (auto &[plane, normal, action] : arena_surfaces_) {
+      // If the trajectory isn't heading towards the surface, ignore it.
       if (trajectory.direction().dot(normal) >= -0.f)
         continue;
 
+      // This is the time at which the collision with the surface happens.
       const auto when = trajectory.intersectionParameter(plane);
 
-      if (when != when || when < -0.f || when > dt)
+      // The trajectory is pointing towards the surface and therefore it must
+      // intersect in the future.
+      assert(when == when);
+      assert(when >= -0.f);
+
+      // Ignore collisions after dt.
+      if (when > dt)
         continue;
 
-      if (result && when >= std::get<0>(*result))
+      // If when is equal to the current collision time, then we're in a corner.
+      // We fall through this case and overwrite; this favours scoring a goal
+      // since the goal surfaces are ordered after the other surfaces, which
+      // results in the puck position being reset and means we don't need to
+      // consider applying a different normal.
+      if (result && when > std::get<0>(*result))
         continue;
 
-      assert(!result || when != std::get<0>(*result)); // FIXME
-
-      result.emplace(when, std::move(action));
+      result.emplace(when, action);
     }
 
     return result;
@@ -163,42 +206,67 @@ public:
     const line_t trajectory{puck().centre(), puck().velocity()};
     const box_t lhs = bordered(lhs_paddle().box(), puck().radius());
     const box_t rhs = bordered(rhs_paddle().box(), puck().radius());
-    assert(!bordered(lhs, -1).contains(puck().centre()));
-    assert(!bordered(rhs, -1).contains(puck().centre()));
 
-    using TT = std::tuple<box_t, plane_t, vec_t>;
-    const std::array planes_and_normals{
-        TT{lhs, plane_t::Through(lhs.min(), lhs.min() + unit::i), -unit::j},
-        TT{lhs, plane_t::Through(lhs.min(), lhs.min() + unit::j), -unit::i},
-        TT{lhs, plane_t::Through(lhs.max(), lhs.max() + unit::i), unit::j},
-        TT{lhs, plane_t::Through(lhs.max(), lhs.max() + unit::j), unit::i},
+    using surface_t = std::tuple<box_t, plane_t, vec_t>;
+    const std::array surfaces{
+        surface_t{lhs, plane_t::Through(lhs.min(), lhs.min() + unit::i),
+                  -unit::j},
+        surface_t{lhs, plane_t::Through(lhs.min(), lhs.min() + unit::j),
+                  -unit::i},
+        surface_t{lhs, plane_t::Through(lhs.max(), lhs.max() + unit::i),
+                  unit::j},
+        surface_t{lhs, plane_t::Through(lhs.max(), lhs.max() + unit::j),
+                  unit::i},
 
-        TT{rhs, plane_t::Through(rhs.min(), rhs.min() + unit::i), -unit::j},
-        TT{rhs, plane_t::Through(rhs.min(), rhs.min() + unit::j), -unit::i},
-        TT{rhs, plane_t::Through(rhs.max(), rhs.max() + unit::i), unit::j},
-        TT{rhs, plane_t::Through(rhs.max(), rhs.max() + unit::j), unit::i},
+        surface_t{rhs, plane_t::Through(rhs.min(), rhs.min() + unit::i),
+                  -unit::j},
+        surface_t{rhs, plane_t::Through(rhs.min(), rhs.min() + unit::j),
+                  -unit::i},
+        surface_t{rhs, plane_t::Through(rhs.max(), rhs.max() + unit::i),
+                  unit::j},
+        surface_t{rhs, plane_t::Through(rhs.max(), rhs.max() + unit::j),
+                  unit::i},
     };
 
-    for (const auto &[b, plane, normal] : planes_and_normals) {
+    for (const auto &[b, plane, normal] : surfaces) {
+      // Continue if we're not heading in the opposite direction to the normal.
       if (trajectory.direction().dot(normal) >= -0.f)
         continue;
 
+      // When the collision with the surface will occur.
       const auto when = trajectory.intersectionParameter(plane);
 
-      if (when != when || when < -0.f || when > dt)
+      // This should be a real number since there's a negative dot product.
+      assert(when == when);
+
+      // If we're the other side of the surface (collision is in the past), or
+      // if the collision is after dt, continue.
+      if (when < -0.f || when > dt)
         continue;
 
-      if (result && when >= std::get<0>(*result))
+      // If this collision isn't earlier than any other collision we already
+      // found, continue.
+      if (result && when > std::get<0>(*result))
         continue;
-
-      assert(!result || when != std::get<0>(*result)); // FIXME
 
       const auto where = trajectory.intersectionPoint(plane);
 
-      if (!b.contains(vec_t{std::round(where(0)), std::round(where(1))}))
+      // There's no collision if we're outside the bounds of the box.
+      if (!b.contains(where))
         continue;
 
-      result.emplace(when, [=, this]() { reflect(normal); });
+      if (when == std::get<0>(*result)) {
+        // We hit two surfaces at the same time (a corner); reflect about both
+        // normals.
+        std::get<1>(*result) = [=, this,
+                                delegate = std::move(std::get<1>(*result))]() {
+          delegate();
+          reflect(normal);
+        };
+      } else {
+        // This is the earliest collision found so far, store it in result.
+        result.emplace(when, [=, this]() { reflect(normal); });
+      }
     }
 
     return result;
