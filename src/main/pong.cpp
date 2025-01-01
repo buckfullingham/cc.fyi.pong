@@ -134,21 +134,21 @@ int main(int, char **) {
   // Our state
   ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+  pong::ai_t ai{std::random_device{}(), 1., 0.001};
+
   pong::arena_t arena{[prng = std::mt19937{std::random_device{}()},
                        theta_dist =
                            std::uniform_real_distribution<float>{
                                pong::constant::pi<float>() / 8.f,
-                               pong::constant::pi<float>() / 4.f},
-                       sign_dist = std::uniform_int_distribution<int>{0, 1},
+                               pong::constant::pi<float>() * 3.f / 8.f},
+                       quadrant_dist = std::uniform_int_distribution<int>{0, 3},
                        speed_dist = std::uniform_real_distribution<float>{
                            200, 300}]() mutable -> pong::vec_t {
-    const pong::scalar_t theta = theta_dist(prng);
-    const pong::matrix_t signs{
-        {pong::scalar_t(sign_dist(prng) * 2 - 1), 0.f},
-        {0.f, pong::scalar_t(sign_dist(prng) * 2 - 1)},
-    };
-    return pong::transform::rot(theta) * signs * pong::unit::i *
-           speed_dist(prng);
+    const pong::scalar_t quadrant =
+        pong::scalar_t(quadrant_dist(prng)) * pong::constant::pi<float>() / 2.f;
+    const pong::matrix_t rot =
+        pong::transform::rot(theta_dist(prng) + quadrant);
+    return rot * pong::unit::i * speed_dist(prng);
   }};
 
   // Main loop
@@ -201,6 +201,10 @@ int main(int, char **) {
 
       arena.rhs_paddle().velocity()(1) =
           ImGui::GetIO().MouseWheel * 5.f / ImGui::GetIO().DeltaTime;
+
+      if (const auto s = ai.paddle_speed(arena, arena.lhs_paddle())) {
+        arena.lhs_paddle().velocity()(1) = *s;
+      }
 
       arena.advance_time(ImGui::GetIO().DeltaTime);
 

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <numeric>
 #include <optional>
+#include <random>
 
 namespace pong {
 
@@ -17,6 +18,23 @@ class puck_t;
 class paddle_t;
 class arena_t;
 using colour_t = Eigen::Matrix<std::uint8_t, 4, 1>;
+
+/**
+ * A function that oscillates linearly from 0 to upper_bound - 1.
+ *
+ * e.g. for upper_bound == 4, this will yield (for 0 <= x << 12):
+ *     0 1 2 3 2 1 0 1 2 3 2 1
+ */
+template <std::floating_point Float>
+inline Float linear_oscillation(const Float upper_bound, Float x) {
+  x += std::floor(x / (upper_bound - 1));
+  return std::floor(std::fmod(x / upper_bound, Float(2))) == 0
+             ? std::fmod(x, upper_bound)
+             : (upper_bound - 1 - std::fmod(x, upper_bound));
+}
+
+inline std::tuple<scalar_t, scalar_t> estimate_next_collision(const arena_t &,
+                                                              const paddle_t &);
 
 class circle_t {
 public:
@@ -77,7 +95,7 @@ public:
   explicit paddle_t(arena_t &arena, Args &&...args)
       : rectangle_t{std::forward<Args>(args)...}, arena_{arena} {}
 
-  std::optional<std::tuple<scalar_t, std::function<void()>>> next_collision(
+  std::optional<std::tuple<scalar_t, std::function<void()>>> next_action(
       scalar_t dt,
       std::optional<std::tuple<scalar_t, std::function<void()>>> result);
 
@@ -133,17 +151,7 @@ public:
     puck().velocity() = next_puck_velocity_();
   }
 
-  void on_lhs_goal() {
-    ++rhs_score();
-    restart_puck();
-  }
-
-  void on_rhs_goal() {
-    ++lhs_score();
-    restart_puck();
-  }
-
-  std::optional<std::tuple<scalar_t, std::function<void()>>> next_collision(
+  std::optional<std::tuple<scalar_t, std::function<void()>>> next_action(
       scalar_t dt,
       std::optional<std::tuple<scalar_t, std::function<void()>>> result);
 
@@ -151,13 +159,12 @@ public:
     while (dt > 0) {
       std::optional<std::tuple<scalar_t, std::function<void()>>> next;
 
-      next = lhs_paddle().next_collision(dt, std::move(next));
-      next = rhs_paddle().next_collision(dt, std::move(next));
-      next = next_collision(dt, std::move(next));
+      next = lhs_paddle().next_action(dt, std::move(next));
+      next = rhs_paddle().next_action(dt, std::move(next));
+      next = next_action(dt, std::move(next));
 
       if (next) {
         auto &[when, action] = *next;
-
         puck().advance_time(when);
         lhs_paddle().advance_time(when);
         rhs_paddle().advance_time(when);
@@ -181,16 +188,50 @@ private:
   std::uint32_t rhs_score_;
 };
 
+class ai_t {
+public:
+  explicit ai_t(std::mt19937::result_type seed, scalar_t prob_reaction,
+                scalar_t stdev)
+      : prng_(seed), prob_reaction_(prob_reaction), react_dist_(0., 1.),
+        error_dist_(0.f, stdev) {}
+
+  ai_t(const ai_t &) = delete;
+  ai_t &operator=(const ai_t &) = delete;
+
+  std::optional<scalar_t> paddle_speed(arena_t &, paddle_t &);
+
+private:
+  bool react() { return react_dist_(prng_) < prob_reaction_; }
+
+  std::mt19937 prng_;
+  scalar_t prob_reaction_;
+  std::uniform_real_distribution<double> react_dist_;
+  std::normal_distribution<scalar_t> error_dist_;
+};
+
 std::optional<std::tuple<scalar_t, std::function<void()>>>
-paddle_t::next_collision(
+paddle_t::next_action(
     pong::scalar_t dt,
     std::optional<std::tuple<scalar_t, std::function<void()>>> result) {
   // paddle can only move north <-> south
   assert(velocity()(0) == 0.f);
 
+  if (velocity()(1) != 0.f) {
+    // paddle hits top or bottom of arena
+    const scalar_t when =
+        velocity()(1) > 0.f
+            ? (arena_.box().max()(1) - box().max()(1) - 1.f) / velocity()(1)
+            : (arena_.box().min()(1) - box().min()(1) + 1.f) / velocity()(1);
+
+    if (when > -0.f && when <= dt && (!result || when < std::get<0>(*result))) {
+      result.emplace(
+          std::forward_as_tuple(when, [this]() { velocity() = vec_t{0, 0}; }));
+    }
+  }
+
   const box_t b = bordered(box(), arena_.puck().radius());
 
-  // north / south
+  // north / south surfaces
   {
     const scalar_t ds = velocity()(1) - arena_.puck().velocity()(1);
 
@@ -202,9 +243,9 @@ paddle_t::next_collision(
       const scalar_t x =
           arena_.puck().centre()(0) + arena_.puck().velocity()(0) * when;
 
-      // if when is in (0, dt) and x is within the bounds of the paddle and this
-      // is the earliest found collision, then set the current result to this
-      // collision
+      // if when is in (0, dt) and x is within the bounds of the paddle and
+      // this is the earliest found collision, then set the current result to
+      // this collision
       if (when >= -0.f && when <= dt && x >= b.min()(0) && x <= b.max()(0) &&
           (!result || when < std::get<0>(*result))) {
         result.emplace(std::forward_as_tuple(
@@ -213,7 +254,7 @@ paddle_t::next_collision(
     }
   }
 
-  // east / west
+  // east / west surfaces
   {
     const scalar_t x0 = arena_.puck().centre()(0);
     const scalar_t s = arena_.puck().velocity()(0);
@@ -241,7 +282,8 @@ void paddle_t::advance_time(scalar_t dt) {
   assert(box().diagonal()(1) > 0.f);
 
   const scalar_t min_y = arena_.box().min()(1) + 1;
-  const scalar_t max_y = arena_.box().max()(1) - box().diagonal()(1) - 1;
+  const scalar_t max_y =
+      arena_.box().max()(1) - (box().max()(1) - box().min()(1)) - 1;
 
   assert(min_y < max_y);
 
@@ -251,8 +293,7 @@ void paddle_t::advance_time(scalar_t dt) {
   box().translate(vec_t{0, y - box().min()(1)});
 }
 
-std::optional<std::tuple<scalar_t, std::function<void()>>>
-arena_t::next_collision(
+std::optional<std::tuple<scalar_t, std::function<void()>>> arena_t::next_action(
     scalar_t dt,
     std::optional<std::tuple<scalar_t, std::function<void()>>> result) {
 
@@ -269,7 +310,7 @@ arena_t::next_collision(
                                 ? (y0 - b.max()(1)) / s  // heading south
                                 : (y0 - b.min()(1)) / s; // heading north
 
-      if (when == when && when >= -0.f && when <= dt &&
+      if (when >= -0.f && when <= dt &&
           (!result || when < std::get<0>(*result))) {
         result.emplace(std::forward_as_tuple(
             when, [this]() { puck().velocity()(1) *= -1; }));
@@ -284,23 +325,90 @@ arena_t::next_collision(
     if (puck().velocity()(0) > -0.f) {
       // heading east
       const scalar_t when = (b.max()(0) - x0) / s;
-      if (when == when && when >= -0.f && when <= dt &&
+      if (when >= -0.f && when <= dt &&
           (!result || when < std::get<0>(*result))) {
-        result.emplace(
-            std::forward_as_tuple(when, [this]() { on_rhs_goal(); }));
+        result.emplace(std::forward_as_tuple(when, [this]() {
+          ++lhs_score_;
+          restart_puck();
+        }));
       }
     } else {
       // heading west
       const scalar_t when = (b.min()(0) - x0) / s;
-      if (when == when && when >= -0.f && when <= dt &&
+      if (when >= -0.f && when <= dt &&
           (!result || when < std::get<0>(*result))) {
-        result.emplace(
-            std::forward_as_tuple(when, [this]() { on_lhs_goal(); }));
+        result.emplace(std::forward_as_tuple(when, [this]() {
+          ++rhs_score_;
+          restart_puck();
+        }));
       }
     }
   }
 
   return result;
+}
+
+inline std::tuple<scalar_t, scalar_t>
+estimate_next_collision(const arena_t &a, const paddle_t &p) {
+  const box_t b = [&]() {
+    const vec_t min{a.lhs_paddle().box().max()(0) + a.puck().radius(),
+                    a.box().min()(1) + a.puck().radius()};
+    const vec_t max{a.rhs_paddle().box().min()(0) - a.puck().radius(),
+                    a.box().max()(1) - a.puck().radius()};
+    return box_t{min, max};
+  }();
+
+  const scalar_t width = b.diagonal()(0);
+  const scalar_t height = b.diagonal()(1);
+  const vec_t rel_puck_pos = a.puck().centre() - b.min();
+  const vec_t rel_paddle_pos =
+      p.box().min() - b.min() + p.box().diagonal() / 2.;
+
+  assert(a.puck().velocity()(0) != 0.f);
+
+  const scalar_t when = [&]() {
+    if (p.box().max()(0) < a.puck().centre()(0)) {
+      // paddle left of puck
+      if (a.puck().velocity()(0) < 0.f) {
+        // heading towards paddle
+        return rel_puck_pos(0);
+      } else {
+        // heading away from paddle
+        return 2.f * width - rel_puck_pos(0);
+      }
+    } else {
+      // paddle right of puck (or =)
+      if (a.puck().velocity()(0) < 0.f) {
+        // heading away from paddle
+        return width + rel_puck_pos(0);
+      } else {
+        // heading towards paddle
+        return width - rel_puck_pos(0);
+      }
+    }
+  }() / std::abs(a.puck().velocity()(0));
+
+  // where within 2 widths / 2 heights
+  const vec_t rel_where = [&]() -> vec_t {
+    const vec_t result = rel_puck_pos + a.puck().velocity() * when;
+    return {
+        (result(0) < 0 ? width : 0.f) + std::fmod(result(0), width),
+        (result(1) < 0 ? height : 0.f) + std::fmod(result(1), height),
+    };
+  }();
+
+  assert(rel_where(0) >= -0.f);
+  assert(rel_where(1) >= -0.f);
+
+  return {when, rel_where(1) - rel_paddle_pos(1)};
+}
+
+std::optional<scalar_t> ai_t::paddle_speed(arena_t &a, paddle_t &p) {
+  if (!react())
+    return {};
+
+  const auto [when, target] = estimate_next_collision(a, p);
+  return (target + error_dist_(prng_)) / when;
 }
 
 } // namespace pong
