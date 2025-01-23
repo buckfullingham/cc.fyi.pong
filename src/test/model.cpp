@@ -137,7 +137,7 @@ TEST_CASE("known breakout cases") {
       auto &[dt, chars] = tests[i];
 
       float floats[4]{};
-      std::memcpy(floats, chars.begin(), sizeof(floats));
+      std::memcpy(floats, &*chars.begin(), sizeof(floats));
 
       a.puck().centre()(0) = floats[0];
       a.puck().centre()(1) = floats[1];
