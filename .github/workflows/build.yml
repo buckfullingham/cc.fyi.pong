@@ -29,4 +29,4 @@ jobs:
         BUILD_TYPE=${{matrix.build_type}}
         BUILD_PROFILE=${{matrix.build_profile}}
         ${{github.workspace}}/ci/container.sh
-        ${{github.workspace}}/ci/build.sh
+        /tmp/cc.fyi.pong/ci/build.sh
