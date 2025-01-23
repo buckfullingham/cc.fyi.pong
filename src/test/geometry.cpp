@@ -1,4 +1,5 @@
 #include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "geometry.hpp"
 
@@ -13,16 +14,8 @@ namespace c = p::constant;
 
 } // namespace
 
-TEST_CASE("pi") { CHECK(c::pi<float>() == Catch::Approx(3.14159)); }
-
-TEST_CASE("e") { CHECK(c::e<float>() == Catch::Approx(2.71828)); }
-
-TEST_CASE("flip_x") {
-  CHECK((t::flip_x * p::vec_t{1, 1}).isApprox(p::vec_t{-1, 1}));
-}
-
-TEST_CASE("flip_y") {
-  CHECK((t::flip_y * p::vec_t{1, 1}).isApprox(p::vec_t{1, -1}));
+TEST_CASE("pi") {
+  CHECK_THAT(c::pi<float>(), Catch::Matchers::WithinRel(3.14159, 5e-6));
 }
 
 TEST_CASE("rot") {

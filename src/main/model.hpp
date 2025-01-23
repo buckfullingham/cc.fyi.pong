@@ -25,12 +25,21 @@ using colour_t = Eigen::Matrix<std::uint8_t, 4, 1>;
  * e.g. for upper_bound == 4, this will yield (for 0 <= x << 12):
  *     0 1 2 3 2 1 0 1 2 3 2 1
  */
-template <std::floating_point Float>
-inline Float linear_oscillation(const Float upper_bound, Float x) {
-  x += std::floor(x / (upper_bound - 1));
-  return std::floor(std::fmod(x / upper_bound, Float(2))) == 0
-             ? std::fmod(x, upper_bound)
-             : (upper_bound - 1 - std::fmod(x, upper_bound));
+inline std::uint64_t linear_oscillation(const std::uint64_t upper_bound,
+                                        std::uint64_t x) {
+  x += x / (upper_bound - 1);
+  return (x / upper_bound) % 2 == 0 ? x % upper_bound
+                                    : upper_bound - 1 - x % upper_bound;
+}
+
+/**
+ * Find the (first) inverse of linear_oscillation given output from the
+ * function and the direction of its derivative (positive true, negative false).
+ */
+inline std::uint64_t linear_oscillation_inverse(const std::uint64_t upper_bound,
+                                                std::uint64_t x,
+                                                bool dx_positive) {
+  return dx_positive ? x : 2 * upper_bound - x - 2;
 }
 
 inline std::tuple<scalar_t, scalar_t> estimate_next_collision(const arena_t &,
@@ -76,6 +85,9 @@ public:
 
   [[nodiscard]] auto &colour() const { return colour_; }
   auto &colour() { return colour_; }
+
+  [[nodiscard]] vec_t centre() const { return box_.min() + box_.diagonal() * .5f; };
+
 
 private:
   box_t box_{};
@@ -225,7 +237,9 @@ paddle_t::next_action(
 
     if (when > -0.f && when <= dt && (!result || when < std::get<0>(*result))) {
       result.emplace(
-          std::forward_as_tuple(when, [this]() { velocity() = vec_t{0, 0}; }));
+          std::forward_as_tuple(when, [this]() {
+            velocity() = vec_t{0, 0};
+          }));
     }
   }
 
@@ -350,57 +364,63 @@ std::optional<std::tuple<scalar_t, std::function<void()>>> arena_t::next_action(
 
 inline std::tuple<scalar_t, scalar_t>
 estimate_next_collision(const arena_t &a, const paddle_t &p) {
-  const box_t b = [&]() {
-    const vec_t min{a.lhs_paddle().box().max()(0) + a.puck().radius(),
-                    a.box().min()(1) + a.puck().radius()};
-    const vec_t max{a.rhs_paddle().box().min()(0) - a.puck().radius(),
-                    a.box().max()(1) - a.puck().radius()};
-    return box_t{min, max};
-  }();
-
-  const scalar_t width = b.diagonal()(0);
-  const scalar_t height = b.diagonal()(1);
-  const vec_t rel_puck_pos = a.puck().centre() - b.min();
-  const vec_t rel_paddle_pos =
-      p.box().min() - b.min() + p.box().diagonal() / 2.;
+  assert(&a.lhs_paddle() == &p || &a.rhs_paddle() == &p);
 
   assert(a.puck().velocity()(0) != 0.f);
 
-  const scalar_t when = [&]() {
-    if (p.box().max()(0) < a.puck().centre()(0)) {
-      // paddle left of puck
-      if (a.puck().velocity()(0) < 0.f) {
-        // heading towards paddle
-        return rel_puck_pos(0);
-      } else {
-        // heading away from paddle
-        return 2.f * width - rel_puck_pos(0);
-      }
-    } else {
-      // paddle right of puck (or =)
-      if (a.puck().velocity()(0) < 0.f) {
-        // heading away from paddle
-        return width + rel_puck_pos(0);
-      } else {
-        // heading towards paddle
-        return width - rel_puck_pos(0);
-      }
-    }
-  }() / std::abs(a.puck().velocity()(0));
+  const bool is_lhs = &p == &a.lhs_paddle();
+  const bool is_going_right = a.puck().velocity()(0) > 0.f;
 
-  // where within 2 widths / 2 heights
-  const vec_t rel_where = [&]() -> vec_t {
-    const vec_t result = rel_puck_pos + a.puck().velocity() * when;
-    return {
-        (result(0) < 0 ? width : 0.f) + std::fmod(result(0), width),
-        (result(1) < 0 ? height : 0.f) + std::fmod(result(1), height),
-    };
-  }();
+  const box_t box{
+      vec_t{a.lhs_paddle().box().max()(0) + a.puck().radius(),
+            a.box().min()(1) + a.puck().radius()},
+      vec_t{a.rhs_paddle().box().min()(0) - a.puck().radius(),
+            a.box().max()(1) - a.puck().radius()},
+  };
 
-  assert(rel_where(0) >= -0.f);
-  assert(rel_where(1) >= -0.f);
+  if (!box.contains(a.puck().centre())) {
+    // don't move if the puck has already left the box
+    return {0.f, p.centre()(1)};
+  }
 
-  return {when, rel_where(1) - rel_paddle_pos(1)};
+  const plane_t plane =
+      is_lhs
+          ? plane_t::Through(box.min(), box.min() + unit::j)
+          : plane_t::Through(box.max(), box.max() + unit::j);
+
+  const line_t trajectory{a.puck().centre(), a.puck().velocity()};
+
+  const auto y_range = std::uint64_t(box.max()(1) - box.min()(1));
+
+  const auto width = box.max()(0) - box.min()(0);
+  const auto x = a.puck().centre()(0) - box.min()(0);
+  const auto y = a.puck().centre()(1) - box.min()(1);
+
+  // how far in x-terms until we hit the boundary
+  const scalar_t x_to_go =
+      [&]() {
+        if (is_lhs) {
+          return is_going_right ? 2 * width - x : x;
+        } else {
+          return is_going_right ? width - x : width + x;
+        }
+      }();
+
+  assert(x_to_go >= 0.f);
+
+  const scalar_t when = x_to_go / std::abs(a.puck().velocity()(0));
+
+  // where are we in the y oscillation when we've gone x_to_go in y
+  const std::uint64_t estimated_y =
+      box.min()(1) +
+      linear_oscillation(
+          y_range + 1,
+          linear_oscillation_inverse(y_range + 1,
+                                     std::uint64_t(y),
+                                     a.puck().velocity()(1) > 0) +
+              x_to_go * std::abs(a.puck().velocity()(1) / a.puck().velocity()(0)));
+
+  return {when, estimated_y};
 }
 
 std::optional<scalar_t> ai_t::paddle_speed(arena_t &a, paddle_t &p) {
@@ -408,7 +428,8 @@ std::optional<scalar_t> ai_t::paddle_speed(arena_t &a, paddle_t &p) {
     return {};
 
   const auto [when, target] = estimate_next_collision(a, p);
-  return (target + error_dist_(prng_)) / when;
+
+  return when == 0.f ? 0.f : (target - p.centre()(1) + error_dist_(prng_)) / when;
 }
 
 } // namespace pong

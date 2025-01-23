@@ -17,7 +17,6 @@ using box_t = Eigen::AlignedBox<scalar_t, 2>;
 
 namespace constant {
 template <std::floating_point T> inline T pi() { return std::acos(T(-1)); }
-template <std::floating_point T> inline T e() { return std::exp(T(1)); }
 } // namespace constant
 
 namespace unit {
@@ -35,18 +34,6 @@ const vec_t j = {scalar_t{0}, scalar_t{1}};
 } // namespace unit
 
 namespace transform {
-
-/**
- * transformation matrix to flip the x co-ordinate of a vector
- */
-const auto flip_x =
-    matrix_t{{scalar_t{-1}, scalar_t{0}}, {scalar_t{0}, scalar_t{1}}};
-
-/**
- * transformation matrix to flip the y co-ordinate of a vector
- */
-const auto flip_y =
-    matrix_t{{scalar_t{1}, scalar_t{0}}, {scalar_t{0}, scalar_t{-1}}};
 
 /**
  * transformation matrix to rotate anti-clockwise by theta radians

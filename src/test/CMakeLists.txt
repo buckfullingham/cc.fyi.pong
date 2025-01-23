@@ -34,13 +34,5 @@ target_link_libraries(model PRIVATE
         test-lib
 )
 
-add_executable(tests
-        tests.cpp
-)
-
-target_link_libraries(tests PRIVATE
-        test-lib
-)
-
+catch_discover_tests(geometry)
 catch_discover_tests(model)
-catch_discover_tests(tests)

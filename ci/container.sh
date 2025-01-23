@@ -2,25 +2,32 @@
 
 set -e
 
-export BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}"
-export BUILD_PROFILE="${BUILD_PROFILE:-emscripten}"
+BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}"
+BUILD_PROFILE="${BUILD_PROFILE:-emscripten}"
+BUILD_CONAN_VOLUME=${CONAN_VOLUME:-conan}
+BUILD_ROOT_IN_CONTAINER=/tmp/"$(basename "$BUILD_ROOT")"
 
 test -d "$BUILD_ROOT"
 test -d "$BUILD_ROOT/ci/$BUILD_PROFILE"
 
-apt update -vy
-apt install -vy docker
+apt update -vy || true
+apt install -vy docker || true
 
 docker build \
   -t "$BUILD_PROFILE" \
   -f "$BUILD_ROOT/ci/$BUILD_PROFILE/Dockerfile" \
   "$BUILD_ROOT/ci"
 
+docker volume create "${BUILD_CONAN_VOLUME}" || true
+
 exec docker run \
   -i \
-  -v "${BUILD_ROOT}:${BUILD_ROOT}" \
   -u 0 \
-  -e BUILD_ROOT \
+  -v "${BUILD_ROOT}:${BUILD_ROOT_IN_CONTAINER}" \
+  -v "${BUILD_CONAN_VOLUME}:/mnt/conan" \
+  -e CONAN_HOME=/mnt/conan \
+  -e "BUILD_ROOT=${BUILD_ROOT_IN_CONTAINER}" \
   -e BUILD_PROFILE \
+  -e BUILD_TYPE \
   "$BUILD_PROFILE" \
   "$@"

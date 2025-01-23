@@ -32,7 +32,7 @@ target_link_libraries(pong.js PRIVATE
 
 install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/pong.js
-        ${CMAKE_CURRENT_BINARY_DIR}/pong.wasm
+        "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:${CMAKE_CURRENT_BINARY_DIR}/pong.wasm>"
         DESTINATION html
 )
 

@@ -31,8 +31,8 @@ conan install -of "$BUILD_DIR" --build=missing "${CONAN_SETTINGS[@]}" .
 
 source ${BUILD_DIR}/conanbuildenv-${BUILD_TYPE_LC}*.sh
 
-$CC --version
-$CXX --version
+"$CC" --version
+"$CXX" --version
 
 # configure build
 cd "$BUILD_DIR"

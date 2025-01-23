@@ -4,6 +4,7 @@
 #include "model.hpp"
 #include <cstring>
 #include <random>
+#include <tuple>
 
 namespace {
 namespace p = pong;
@@ -37,6 +38,9 @@ TEST_CASE("advance time through a horizontal collision with a paddle") {
   a.advance_time(a.rhs_paddle().box().min()(0) - a.puck().radius() -
                  a.puck().centre()(0) - 1.f);
   CHECK(a.puck().velocity() == p::vec_t{1.f, 0.f});
+
+  // this takes us to 1 after the collision, when the x component of velocity
+  // should have a reversed sign
   a.advance_time(2.f);
   CHECK(a.puck().velocity().isApprox(p::vec_t{-1.f, 0.f}));
 }
@@ -215,90 +219,19 @@ TEST_CASE("puck collides with moving paddle") {
   CHECK(a.puck().velocity()(1) == -puck_velocity(1));
 }
 
-TEST_CASE("estimating next collision stationary paddles") {
-  std::size_t start_count = 0;
-
-  // distance between the two paddles
-  const p::scalar_t width = []() {
-    p::arena_t a{[&]() -> p::vec_t { return {}; }};
-    return p::bordered(a.rhs_paddle().box(), a.puck().radius()).min()(0) -
-           p::bordered(a.lhs_paddle().box(), a.puck().radius()).max()(0);
-  }();
-
-  // distance between the top and bottom arena boundaries
-  const p::scalar_t height = []() {
-    p::arena_t a{[&]() -> p::vec_t { return {}; }};
-    return p::bordered(a.box(), -a.puck().radius()).diagonal()(1);
-  }();
-
-  // choose a velocity that results in repeated collisions with the stationary
-  // paddles by bouncing off the top / bottom of the arena
-  p::arena_t a{[&]() -> p::vec_t {
-    ++start_count;
-    return {1, 2.f * height / width};
-  }};
-
-  {
-    auto [when, movement] = p::estimate_next_collision(a, a.rhs_paddle());
-    CHECK_THAT(when, m::WithinRel(.5f * width, 1e-3f));
-  }
-
-  {
-    auto [when, movement] = p::estimate_next_collision(a, a.lhs_paddle());
-    CHECK_THAT(when, m::WithinRel(1.5f * width, 1e-3f));
-  }
-
-  for (int i = 0; i < 1000; ++i) {
-    {
-      auto [when, movement] = p::estimate_next_collision(a, a.rhs_paddle());
-      CHECK_THAT(movement, m::WithinAbs(0.f, 1.f));
-    }
-
-    {
-      auto [when, movement] = p::estimate_next_collision(a, a.lhs_paddle());
-      CHECK_THAT(movement, m::WithinAbs(0.f, 1.f));
-    }
-
-    // advance to within 0.1 * width of the next collision
-    a.advance_time(.1f * width);
-  }
-  CHECK(start_count == 1);
-
-  a.advance_time(3.4f * width);
-  CHECK(start_count == 1);
-  const p::vec_t v1 = a.puck().velocity();
-  // we should get a collision here
-  {
-    auto [when, movement] = p::estimate_next_collision(a, a.lhs_paddle());
-    CHECK_THAT(when, m::WithinRel(.1f * width, 1e-2f));
-    CHECK_THAT(movement, m::WithinAbs(0.f, .5f));
-  }
-  {
-    auto [when, movement] = p::estimate_next_collision(a, a.rhs_paddle());
-    CHECK_THAT(when, m::WithinRel(1.1f * width, 1e-2f));
-    CHECK_THAT(movement, m::WithinAbs(0.f, .5f));
-  }
-  a.advance_time(.2f * width);
-  CHECK(start_count == 1);
-  const p::vec_t v2 = a.puck().velocity();
-  CHECK(v1(0) != v2(0));
-  CHECK(v1(1) == v2(1));
-}
-
 TEST_CASE("linear_oscillation") {
-  std::vector<double> positions;
+  std::vector<std::uint64_t> positions;
 
   const long cycles = 10;
   const long upper_bound = 10;
 
-  for (long i = 0; i < cycles * upper_bound * 2; ++i) {
-    positions.push_back(
-        p::linear_oscillation(double(upper_bound), double(i) / 2.));
+  for (long i = 0; i < cycles * upper_bound; ++i) {
+    positions.push_back(p::linear_oscillation(upper_bound, i));
   }
 
   // output starts increasing from 0
   CHECK(positions[0] == 0);
-  CHECK(positions[1] == .5);
+  CHECK(positions[1] == 1);
 
   // range >= 0
   CHECK(std::all_of(positions.begin(), positions.end(),
@@ -311,6 +244,250 @@ TEST_CASE("linear_oscillation") {
   // output is continuous for continuous x
   CHECK(std::adjacent_find(positions.begin(), positions.end(),
                            [](auto l, auto r) {
-                             return !(l == r + .5 || r == l + .5);
+                             return !(l == r + 1 || r == l + 1);
                            }) == positions.end());
+}
+
+TEST_CASE("linear oscillation inverse") {
+  // 0 1 2 3 4 5 6
+  // 0 1 2 3 2 1 0
+  CHECK(p::linear_oscillation_inverse(4, 0, true) == 0);
+  CHECK(p::linear_oscillation_inverse(4, 1, true) == 1);
+  CHECK(p::linear_oscillation_inverse(4, 2, true) == 2);
+  CHECK(p::linear_oscillation_inverse(4, 3, true) == 3);
+  CHECK(p::linear_oscillation_inverse(4, 3, false) == 3);
+  CHECK(p::linear_oscillation_inverse(4, 2, false) == 4);
+  CHECK(p::linear_oscillation_inverse(4, 1, false) == 5);
+  CHECK(p::linear_oscillation_inverse(4, 0, false) == 6);
+}
+
+TEST_CASE("estimating next paddle collision at rhs, starting height") {
+  auto [puck, box] = []() {
+    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    return std::make_tuple(
+        a.puck(),
+        p::box_t{
+            p::vec_t{a.lhs_paddle().box().max()(0) + a.puck().radius(),
+                     a.box().min()(1) + a.puck().radius()},
+            p::vec_t{a.rhs_paddle().box().min()(0) - a.puck().radius(),
+                     a.box().max()(1) - a.puck().radius()},
+        });
+  }();
+
+  const p::scalar_t distance_to_rhs = box.max()(0) - puck.centre()(0);
+
+  const p::scalar_t distance_to_bottom = box.max()(1) - puck.centre()(1);
+
+  /*     +--------------------+
+   *     |                    | start in the centre, bounce off the bottom and
+   *     |                    | hit the paddle at the puck's starting y co-ord
+   *     |                 |  |
+   *     |         \      /|  |
+   *     |          \    / |  |
+   *     |           \  /     |
+   *     |            \/      |
+   *     +--------------------+
+   */
+  p::arena_t a{
+      [&]() { return p::vec_t{distance_to_rhs, 2 * distance_to_bottom}; }};
+
+  const auto [when, where_y] = p::estimate_next_collision(a, a.rhs_paddle());
+
+  CHECK_THAT(when, m::WithinRel(1.f, .01f));
+  CHECK(where_y == a.puck().centre()(1));
+}
+
+TEST_CASE("estimating next paddle collision at rhs, half height") {
+  auto [puck, box] = []() {
+    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    return std::make_tuple(
+        a.puck(),
+        p::box_t{
+            p::vec_t{a.lhs_paddle().box().max()(0) + a.puck().radius(),
+                     a.box().min()(1) + a.puck().radius()},
+            p::vec_t{a.rhs_paddle().box().min()(0) - a.puck().radius(),
+                     a.box().max()(1) - a.puck().radius()},
+        });
+  }();
+
+  const p::scalar_t distance_to_rhs = box.max()(0) - puck.centre()(0);
+
+  const p::scalar_t distance_to_bottom = box.max()(1) - puck.centre()(1);
+
+  /*     +--------------+
+   *     |              |
+   *     |              |
+   *     |              |
+   *     |      \     | |
+   *     |       \    | |
+   *     |        \  /| |
+   *     |         \/   |
+   *     +--------------+
+   */
+  p::arena_t a{
+      [&]() { return p::vec_t{distance_to_rhs, 1.5f * distance_to_bottom}; }};
+
+  const auto [when, where_y] = p::estimate_next_collision(a, a.rhs_paddle());
+
+  CHECK_THAT(when, m::WithinRel(1.f, .01f));
+  CHECK_THAT(
+      where_y,
+      m::WithinAbs(a.puck().centre()(1) + distance_to_bottom / 2.f, 1.f));
+}
+
+TEST_CASE("estimating next but one paddle collision") {
+  // same as estimating the next collision on the rhs except this is a collision
+  // with the lhs paddle after initially travelling rightwards
+
+  auto [puck, box] = []() {
+    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    return std::make_tuple(
+        a.puck(),
+        p::box_t{
+            p::vec_t{a.lhs_paddle().box().max()(0) + a.puck().radius(),
+                     a.box().min()(1) + a.puck().radius()},
+            p::vec_t{a.rhs_paddle().box().min()(0) - a.puck().radius(),
+                     a.box().max()(1) - a.puck().radius()},
+        });
+  }();
+
+  const p::scalar_t x_range = box.max()(0) - box.min()(0);
+  const p::scalar_t distance_to_rhs = box.max()(0) - puck.centre()(0);
+  const p::scalar_t distance_to_lhs = distance_to_rhs + x_range;
+  const p::scalar_t distance_to_bottom = box.max()(1) - puck.centre()(1);
+
+  p::arena_t a{
+      [&]() { return p::vec_t{distance_to_lhs, 2 * distance_to_bottom}; }};
+
+  const auto [when, where_y] = p::estimate_next_collision(a, a.lhs_paddle());
+
+  CHECK_THAT(when, m::WithinRel(1.f, .01f));
+  CHECK(where_y == a.puck().centre()(1));
+}
+
+TEST_CASE("estimating next paddle collision at lhs, starting height") {
+  auto [puck, box] = []() {
+    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    return std::make_tuple(
+        a.puck(),
+        p::box_t{
+            p::vec_t{a.lhs_paddle().box().max()(0) + a.puck().radius(),
+                     a.box().min()(1) + a.puck().radius()},
+            p::vec_t{a.rhs_paddle().box().min()(0) - a.puck().radius(),
+                     a.box().max()(1) - a.puck().radius()},
+        });
+  }();
+
+  const p::scalar_t distance_to_lhs = puck.centre()(0) - box.min()(0);
+  const p::scalar_t distance_to_top = puck.centre()(1) - box.min()(1);
+
+  p::arena_t a{
+      [&]() { return p::vec_t{-distance_to_lhs, -2 * distance_to_top}; }};
+
+  const auto [when, where_y] = p::estimate_next_collision(a, a.lhs_paddle());
+
+  CHECK_THAT(when, m::WithinRel(1.f, .01f));
+  CHECK(where_y == a.puck().centre()(1));
+}
+
+TEST_CASE("estimating next paddle collision at lhs, 1.5 height") {
+  auto [puck, box] = []() {
+    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    return std::make_tuple(
+        a.puck(),
+        p::box_t{
+            p::vec_t{a.lhs_paddle().box().max()(0) + a.puck().radius(),
+                     a.box().min()(1) + a.puck().radius()},
+            p::vec_t{a.rhs_paddle().box().min()(0) - a.puck().radius(),
+                     a.box().max()(1) - a.puck().radius()},
+        });
+  }();
+
+  const p::scalar_t distance_to_lhs = puck.centre()(0) - box.min()(0);
+  const p::scalar_t distance_to_top = puck.centre()(1) - box.min()(1);
+
+  p::arena_t a{
+      [&]() { return p::vec_t{-distance_to_lhs, -1.5f * distance_to_top}; }};
+
+  {
+    const auto [when, where_y] = p::estimate_next_collision(a, a.lhs_paddle());
+
+    CHECK_THAT(when, m::WithinRel(1.f, .01f));
+    CHECK_THAT(where_y,
+               m::WithinAbs(box.min()(1) + .5f * distance_to_top, 1.f));
+  }
+
+  a.advance_time(0.1f);
+
+  {
+    const auto [when, where_y] = p::estimate_next_collision(a, a.lhs_paddle());
+
+    CHECK_THAT(when, m::WithinRel(.9f, .01f));
+    CHECK_THAT(where_y,
+               m::WithinAbs(box.min()(1) + .5f * distance_to_top, 1.f));
+  }
+
+  a.advance_time(0.1f);
+
+  {
+    const auto [when, where_y] = p::estimate_next_collision(a, a.lhs_paddle());
+
+    CHECK_THAT(when, m::WithinRel(.8f, .01f));
+    CHECK_THAT(where_y,
+               m::WithinAbs(box.min()(1) + .5f * distance_to_top, 1.f));
+  }
+}
+
+TEST_CASE("estimate_next_collision stability") {
+  std::mt19937 prng{c::rngSeed()};
+  std::exponential_distribution<float> dt_dist{60.f};
+  p::arena_t a{make_starter()};
+
+  // Only going past or colliding with a paddle should change the estimated
+  // point of the next collision.  Check that as we advance time, the estimate
+  // doesn't change.
+  for (int i = 0; i < 1 << 10; ++i) {
+    const auto old_dx_sign = std::signbit(a.puck().velocity()(0));
+    const auto [old_lhs_when, old_lhs_estimate] =
+        p::estimate_next_collision(a, a.lhs_paddle());
+    const auto [old_rhs_when, old_rhs_estimate] =
+        p::estimate_next_collision(a, a.rhs_paddle());
+    a.advance_time(dt_dist(prng));
+    const auto new_dx_sign = std::signbit(a.puck().velocity()(0));
+    const auto [new_lhs_when, new_lhs_estimate] =
+        p::estimate_next_collision(a, a.lhs_paddle());
+    const auto [new_rhs_when, new_rhs_estimate] =
+        p::estimate_next_collision(a, a.rhs_paddle());
+    const auto do_not_check = old_lhs_when == 0 || old_rhs_when == 0 ||
+                              new_lhs_when == 0 || new_rhs_when == 0 ||
+                              old_dx_sign != new_dx_sign;
+    if (!do_not_check) {
+      CHECK_THAT(new_lhs_estimate, m::WithinAbs(old_lhs_estimate, 2.f));
+      CHECK_THAT(new_rhs_estimate, m::WithinAbs(old_rhs_estimate, 2.f));
+    }
+  }
+}
+
+TEST_CASE("perfect ai vs perfect ai") {
+  std::mt19937 prng{c::rngSeed()};
+  std::exponential_distribution<float> dt_dist(60.f);
+
+  p::arena_t a{make_starter()};
+  p::ai_t ai{c::rngSeed(), 1.f, 0.f};
+
+  for (int i = 0; i < 1 << 20; ++i) {
+    if (const auto y_speed = ai.paddle_speed(a, a.lhs_paddle())) {
+      a.lhs_paddle().velocity()(1) = *y_speed;
+    }
+    if (const auto y_speed = ai.paddle_speed(a, a.rhs_paddle())) {
+      a.rhs_paddle().velocity()(1) = *y_speed;
+    }
+    a.advance_time(dt_dist(prng));
+  }
+
+  CHECK(a.lhs_score() == 0);
+  CHECK(a.rhs_score() == 0);
+  CHECK(a.box().contains(a.puck().centre()));
+  CHECK(a.box().contains(a.lhs_paddle().box()));
+  CHECK(a.box().contains(a.rhs_paddle().box()));
 }

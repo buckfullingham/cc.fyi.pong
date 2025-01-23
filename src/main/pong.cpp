@@ -1,8 +1,3 @@
-// Dear ImGui: standalone example application for GLFW + OpenGL 3, using
-// programmable pipeline (GLFW is a cross-platform general purpose library for
-// handling windows, inputs, OpenGL/Vulkan/Metal graphics context creation,
-// etc.)
-
 // Learn about Dear ImGui:
 // - FAQ                  https://dearimgui.com/faq
 // - Getting Started      https://dearimgui.com/getting-started
@@ -56,13 +51,8 @@ inline ImU32 col(Eigen::Matrix<std::uint8_t, 4, 1> v) {
   return IM_COL32(v(0), v(1), v(2), v(3));
 }
 
-// inline Eigen::Vector4f vec(ImVec4 v) {
-//   return {v.x, v.y, v.z, v.w};
-// }
-
 } // namespace
 
-// Main code
 int main(int, char **) {
   std::cout << "starting..." << std::endl;
   glfwSetErrorCallback(glfw_error_callback);
@@ -134,7 +124,7 @@ int main(int, char **) {
   // Our state
   ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-  pong::ai_t ai{std::random_device{}(), 1., 0.001};
+  pong::ai_t ai{std::random_device{}(), 1.f, 0.f};
 
   pong::arena_t arena{[prng = std::mt19937{std::random_device{}()},
                        theta_dist =
