@@ -28,3 +28,5 @@ RUN apt -y install libxcb-cursor-dev
 RUN apt -y install libxkbcommon-x11-dev
 RUN apt -y install libxcb-dri2-0-dev
 RUN apt -y install libxcb-xinerama0-dev
+
+ENV BUILD_PROFILE=linux
