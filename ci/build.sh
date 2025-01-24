@@ -10,8 +10,13 @@ BUILD_DIR="${BUILD_DIR:-"cmake-build-${BUILD_TYPE_LC}-${BUILD_PROFILE}"}"
 
 if [ "$BUILD_PROFILE" == emscripten ]; then
   CMAKE="emcmake cmake"
+  CMAKE_EMULATOR_SETTINGS=(
+    -DCMAKE_CROSSCOMPILING_EMULATOR=node
+  )
 else
   CMAKE=cmake
+  CMAKE_EMULATOR_SETTINGS=(
+  )
 fi
 
 python3 --version
@@ -41,7 +46,8 @@ $CMAKE .. \
   -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
   -DBUILD_PROFILE=$BUILD_PROFILE \
-  -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+  -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+  "${CMAKE_EMULATOR_SETTINGS[@]}"
 
 # put dependencies' dll's on LD_LIBRARY_PATH etc
 source conanrun.sh

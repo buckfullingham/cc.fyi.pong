@@ -9,13 +9,13 @@ set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Werror")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic -Werror")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 
-# conan / emscripten incompatibiit : they both use cmake toolchain files
-# so we need to provice our own method of distinguishing between emscripten
+# conan / emscripten incompatibility : they both use cmake toolchain files
+# so we need to provide our own method of distinguishing between emscripten
 # and linux builds, for which we use the BUILD_PROFILE variable
 add_compile_options(
         "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-fwasm-exceptions>"
