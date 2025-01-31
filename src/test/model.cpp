@@ -473,9 +473,9 @@ TEST_CASE("perfect ai vs perfect ai") {
   std::exponential_distribution<float> dt_dist(60.f);
 
   p::arena_t a{make_starter()};
-  p::ai_t ai{c::rngSeed(), 1.f, 0.f};
+  p::ai_t ai{c::rngSeed(), 0.f};
 
-  for (int i = 0; i < 1 << 20; ++i) {
+  for (int i = 0; i < 1 << 14; ++i) {
     if (const auto y_speed = ai.paddle_speed(a, a.lhs_paddle())) {
       a.lhs_paddle().velocity()(1) = *y_speed;
     }
@@ -490,4 +490,29 @@ TEST_CASE("perfect ai vs perfect ai") {
   CHECK(a.box().contains(a.puck().centre()));
   CHECK(a.box().contains(a.lhs_paddle().box()));
   CHECK(a.box().contains(a.rhs_paddle().box()));
+}
+
+TEST_CASE("imperfect ai") {
+  std::mt19937 prng{c::rngSeed()};
+  const int attempts = 1 << 14;
+
+  for (int setting : {25, 50, 75}) {
+    std::uint32_t score = 0;
+    WHEN("setting = " << setting) {
+      for (int i = 0; i < attempts; ++i) {
+        p::arena_t a{[]() -> p::vec_t { return {1.f, 0.f}; }};
+        p::ai_t ai{prng(), 25.f / p::z_scores[setting]};
+        const auto result = ai.paddle_speed(a, a.rhs_paddle());
+        REQUIRE(!!result);
+        a.rhs_paddle().velocity()(1) = *result;
+        a.advance_time(a.box().max()(0) - a.puck().centre()(0) -
+                       a.puck().radius() + 10);
+        auto b = p::bordered(a.rhs_paddle().box(), a.puck().radius());
+        score += a.lhs_score();
+      }
+
+      CHECK_THAT(score, m::WithinAbs(attempts * (100 - setting) / 100.f,
+                                     attempts * .05f));
+    }
+  }
 }

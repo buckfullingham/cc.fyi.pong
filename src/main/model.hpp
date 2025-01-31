@@ -9,6 +9,7 @@
 #include <numeric>
 #include <optional>
 #include <random>
+#include <utility>
 
 namespace pong {
 
@@ -41,6 +42,29 @@ inline std::uint64_t linear_oscillation_inverse(const std::uint64_t upper_bound,
                                                 bool dx_positive) {
   return dx_positive ? x : 2 * upper_bound - x - 2;
 }
+
+constexpr float z_scores[100]{
+    0.f,          0.01253347f,  0.025068908f, 0.037608288f, 0.050153583f,
+    0.062706778f, 0.075269862f, 0.087844838f, 0.100433721f, 0.113038541f,
+    0.125661347f, 0.138304208f, 0.150969215f, 0.163658486f, 0.176374165f,
+    0.189118426f, 0.201893479f, 0.214701568f, 0.227544977f, 0.240426031f,
+    0.253347103f, 0.266310613f, 0.279319034f, 0.292374896f, 0.305480788f,
+    0.318639364f, 0.331853346f, 0.345125531f, 0.358458793f, 0.371856089f,
+    0.385320466f, 0.398855066f, 0.412463129f, 0.426148008f, 0.439913166f,
+    0.45376219f,  0.467698799f, 0.48172685f,  0.495850347f, 0.510073457f,
+    0.524400513f, 0.53883603f,  0.55338472f,  0.568051498f, 0.582841507f,
+    0.597760126f, 0.612812991f, 0.628006014f, 0.643345405f, 0.658837693f,
+    0.67448975f,  0.690308824f, 0.706302563f, 0.722479052f, 0.738846849f,
+    0.755415026f, 0.772193214f, 0.789191653f, 0.806421247f, 0.82389363f,
+    0.841621234f, 0.859617364f, 0.877896295f, 0.896473364f, 0.915365088f,
+    0.934589291f, 0.954165253f, 0.974113877f, 0.994457883f, 1.015222033f,
+    1.036433389f, 1.058121618f, 1.080319341f, 1.103062556f, 1.126391129f,
+    1.15034938f,  1.174986792f, 1.200358858f, 1.22652812f,  1.253565438f,
+    1.281551566f, 1.310579112f, 1.340755034f, 1.372203809f, 1.40507156f,
+    1.439531471f, 1.475791028f, 1.514101888f, 1.554773595f, 1.59819314f,
+    1.644853627f, 1.69539771f,  1.750686071f, 1.811910673f, 1.880793608f,
+    1.959963985f, 2.053748911f, 2.170090378f, 2.326347874f, 2.575829304f,
+};
 
 inline std::tuple<scalar_t, scalar_t> estimate_next_collision(const arena_t &,
                                                               const paddle_t &);
@@ -202,10 +226,9 @@ private:
 
 class ai_t {
 public:
-  explicit ai_t(std::mt19937::result_type seed, scalar_t prob_reaction,
-                scalar_t stdev)
-      : prng_(seed), prob_reaction_(prob_reaction), react_dist_(0., 1.),
-        error_dist_(0.f, stdev) {}
+  explicit ai_t(std::mt19937::result_type seed, scalar_t stdev)
+      : prng_(seed), error_dist_(0.f, stdev),
+        last_estimate_{std::numeric_limits<scalar_t>::max()} {}
 
   ai_t(const ai_t &) = delete;
   ai_t &operator=(const ai_t &) = delete;
@@ -213,12 +236,9 @@ public:
   std::optional<scalar_t> paddle_speed(arena_t &, paddle_t &);
 
 private:
-  bool react() { return react_dist_(prng_) < prob_reaction_; }
-
   std::mt19937 prng_;
-  scalar_t prob_reaction_;
-  std::uniform_real_distribution<double> react_dist_;
   std::normal_distribution<scalar_t> error_dist_;
+  scalar_t last_estimate_;
 };
 
 std::optional<std::tuple<scalar_t, std::function<void()>>>
@@ -278,10 +298,13 @@ paddle_t::next_action(
     const scalar_t y =
         arena_.puck().centre()(1) + arena_.puck().velocity()(1) * when;
 
+    const scalar_t min_y = b.min()(1) + when * velocity()(1);
+    const scalar_t max_y = b.max()(1) + when * velocity()(1);
+
     // if when is in (0, dt) and y is within the bounds of the paddle and this
     // is the earliest found collision, then set the current result to this
     // collision
-    if (when >= -0.f && when <= dt && y >= b.min()(1) && y <= b.max()(1) &&
+    if (when >= -0.f && when <= dt && y >= min_y && y <= max_y &&
         (!result || when < std::get<0>(*result))) {
       result.emplace(std::forward_as_tuple(
           when, [this]() { arena_.puck().velocity()(0) *= -1; }));
@@ -424,10 +447,10 @@ estimate_next_collision(const arena_t &a, const paddle_t &p) {
 }
 
 std::optional<scalar_t> ai_t::paddle_speed(arena_t &a, paddle_t &p) {
-  if (!react())
-    return {};
-
   const auto [when, target] = estimate_next_collision(a, p);
+
+  if (std::abs(target - std::exchange(last_estimate_, target)) < 2.f)
+    return {};
 
   return when == 0.f ? 0.f : (target - p.centre()(1) + error_dist_(prng_)) / when;
 }
