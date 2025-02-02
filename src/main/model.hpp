@@ -192,6 +192,12 @@ public:
       std::optional<std::tuple<scalar_t, std::function<void()>>> result);
 
   void advance_time(scalar_t dt) {
+    auto do_advance = [this](scalar_t t){
+      puck().advance_time(t);
+      lhs_paddle().advance_time(t);
+      rhs_paddle().advance_time(t);
+    };
+
     while (dt > 0) {
       std::optional<std::tuple<scalar_t, std::function<void()>>> next;
 
@@ -201,15 +207,11 @@ public:
 
       if (next) {
         auto &[when, action] = *next;
-        puck().advance_time(when);
-        lhs_paddle().advance_time(when);
-        rhs_paddle().advance_time(when);
+        do_advance(when);
         action();
         dt -= when;
       } else {
-        puck().advance_time(dt);
-        lhs_paddle().advance_time(dt);
-        rhs_paddle().advance_time(dt);
+        do_advance(dt);
         dt = 0;
       }
     }

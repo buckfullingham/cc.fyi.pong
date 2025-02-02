@@ -219,6 +219,19 @@ int main(int, char **) {
                              &*lhs_score.end());
           draw_list->AddText({rhs_x, y}, solid_white, &*rhs_score.begin(),
                              &*rhs_score.end());
+          // puck
+          draw_list->AddCircleFilled(vec(origin + arena.puck().centre()),
+                                     arena.puck().radius(),
+                                     col(arena.puck().colour()));
+          // lhs paddle
+          draw_list->AddRectFilled(vec(origin + arena.lhs_paddle().box().min()),
+                                   vec(origin + arena.lhs_paddle().box().max()),
+                                   col(arena.lhs_paddle().colour()));
+
+          // rhs paddle
+          draw_list->AddRectFilled(vec(origin + arena.rhs_paddle().box().min()),
+                                   vec(origin + arena.rhs_paddle().box().max()),
+                                   col(arena.rhs_paddle().colour()));
         } else {
           const std::string s = "WINNER!";
           const auto width = ImGui::CalcTextSize(&*s.begin(), &*s.end()).x;
@@ -235,24 +248,10 @@ int main(int, char **) {
           draw_list->AddText({x, y}, solid_white, &*s.begin(), &*s.end());
         }
 
-        // puck
-        draw_list->AddCircleFilled(vec(origin + arena.puck().centre()),
-                                   arena.puck().radius(),
-                                   col(arena.puck().colour()));
-
-        // lhs paddle
-        draw_list->AddRectFilled(vec(origin + arena.lhs_paddle().box().min()),
-                                 vec(origin + arena.lhs_paddle().box().max()),
-                                 col(arena.lhs_paddle().colour()));
-
-        // rhs paddle
-        draw_list->AddRectFilled(vec(origin + arena.rhs_paddle().box().min()),
-                                 vec(origin + arena.rhs_paddle().box().max()),
-                                 col(arena.rhs_paddle().colour()));
-        ImGui::EndChild();
       }
-      ImGui::End();
+      ImGui::EndChild();
     }
+    ImGui::End();
 
     ImGui::Render();
     int display_w, display_h;
