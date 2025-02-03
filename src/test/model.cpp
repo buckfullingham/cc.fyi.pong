@@ -3,6 +3,7 @@
 
 #include "model.hpp"
 #include <cstring>
+#include <functional>
 #include <random>
 #include <tuple>
 
@@ -12,29 +13,14 @@ namespace c = Catch;
 namespace m = c::Matchers;
 namespace u = p::unit;
 
-std::function<p::vec_t()> make_starter() {
-  return [prng = std::mt19937{c::rngSeed()},
-          theta_dist =
-              std::uniform_real_distribution<float>{
-                  p::constant::pi<float>() / 8.f,
-                  p::constant::pi<float>() * 3.f / 8.f},
-          sign_dist = std::uniform_int_distribution<int>{0, 1},
-          speed_dist = std::uniform_real_distribution<float>{
-              150, 250}]() mutable -> p::vec_t {
-    const p::scalar_t theta = theta_dist(prng);
-    const p::matrix_t signs{
-        {p::scalar_t(sign_dist(prng) * 2 - 1), 0.f},
-        {0.f, p::scalar_t(sign_dist(prng) * 2 - 1)},
-    };
-    return p::transform::rot(theta) * signs * p::unit::i * speed_dist(prng);
-  };
-}
+auto make_starter() { return p::make_starter(c::rngSeed()); }
 
 } // namespace
 
 TEST_CASE("advance time through a horizontal collision with a paddle") {
-  p::arena_t a{make_starter()};
-  a.puck().velocity() = {1.f, 0.f};
+  p::arena_t a{[]() -> std::tuple<p::scalar_t, p::vec_t> {
+    return {240.f, {1.f, 0.f}};
+  }};
   a.advance_time(a.rhs_paddle().box().min()(0) - a.puck().radius() -
                  a.puck().centre()(0) - 1.f);
   CHECK(a.puck().velocity() == p::vec_t{1.f, 0.f});
@@ -263,7 +249,8 @@ TEST_CASE("linear oscillation inverse") {
 
 TEST_CASE("estimating next paddle collision at rhs, starting height") {
   auto [puck, box] = []() {
-    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    p::arena_t a{
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -288,8 +275,9 @@ TEST_CASE("estimating next paddle collision at rhs, starting height") {
    *     |            \/      |
    *     +--------------------+
    */
-  p::arena_t a{
-      [&]() { return p::vec_t{distance_to_rhs, 2 * distance_to_bottom}; }};
+  p::arena_t a{[&]() -> std::tuple<p::scalar_t, p::vec_t> {
+    return {240.f, p::vec_t{distance_to_rhs, 2 * distance_to_bottom}};
+  }};
 
   const auto [when, where_y] = p::estimate_next_collision(a, a.rhs_paddle());
 
@@ -299,7 +287,8 @@ TEST_CASE("estimating next paddle collision at rhs, starting height") {
 
 TEST_CASE("estimating next paddle collision at rhs, half height") {
   auto [puck, box] = []() {
-    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    p::arena_t a{
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -324,8 +313,9 @@ TEST_CASE("estimating next paddle collision at rhs, half height") {
    *     |         \/   |
    *     +--------------+
    */
-  p::arena_t a{
-      [&]() { return p::vec_t{distance_to_rhs, 1.5f * distance_to_bottom}; }};
+  p::arena_t a{[&]() -> std::tuple<p::scalar_t, p::vec_t> {
+    return {240., p::vec_t{distance_to_rhs, 1.5f * distance_to_bottom}};
+  }};
 
   const auto [when, where_y] = p::estimate_next_collision(a, a.rhs_paddle());
 
@@ -340,7 +330,8 @@ TEST_CASE("estimating next but one paddle collision") {
   // with the lhs paddle after initially travelling rightwards
 
   auto [puck, box] = []() {
-    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    p::arena_t a{
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -356,8 +347,9 @@ TEST_CASE("estimating next but one paddle collision") {
   const p::scalar_t distance_to_lhs = distance_to_rhs + x_range;
   const p::scalar_t distance_to_bottom = box.max()(1) - puck.centre()(1);
 
-  p::arena_t a{
-      [&]() { return p::vec_t{distance_to_lhs, 2 * distance_to_bottom}; }};
+  p::arena_t a{[&]() -> std::tuple<p::scalar_t, p::vec_t> {
+    return {240.f, p::vec_t{distance_to_lhs, 2 * distance_to_bottom}};
+  }};
 
   const auto [when, where_y] = p::estimate_next_collision(a, a.lhs_paddle());
 
@@ -367,7 +359,8 @@ TEST_CASE("estimating next but one paddle collision") {
 
 TEST_CASE("estimating next paddle collision at lhs, starting height") {
   auto [puck, box] = []() {
-    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    p::arena_t a{
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -381,8 +374,9 @@ TEST_CASE("estimating next paddle collision at lhs, starting height") {
   const p::scalar_t distance_to_lhs = puck.centre()(0) - box.min()(0);
   const p::scalar_t distance_to_top = puck.centre()(1) - box.min()(1);
 
-  p::arena_t a{
-      [&]() { return p::vec_t{-distance_to_lhs, -2 * distance_to_top}; }};
+  p::arena_t a{[&]() -> std::tuple<p::scalar_t, p::vec_t> {
+    return {240.f, p::vec_t{-distance_to_lhs, -2 * distance_to_top}};
+  }};
 
   const auto [when, where_y] = p::estimate_next_collision(a, a.lhs_paddle());
 
@@ -392,7 +386,8 @@ TEST_CASE("estimating next paddle collision at lhs, starting height") {
 
 TEST_CASE("estimating next paddle collision at lhs, 1.5 height") {
   auto [puck, box] = []() {
-    p::arena_t a{[]() -> p::vec_t { return {}; }};
+    p::arena_t a{
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -406,8 +401,9 @@ TEST_CASE("estimating next paddle collision at lhs, 1.5 height") {
   const p::scalar_t distance_to_lhs = puck.centre()(0) - box.min()(0);
   const p::scalar_t distance_to_top = puck.centre()(1) - box.min()(1);
 
-  p::arena_t a{
-      [&]() { return p::vec_t{-distance_to_lhs, -1.5f * distance_to_top}; }};
+  p::arena_t a{[&]() -> std::tuple<p::scalar_t, p::vec_t> {
+    return {240.f, p::vec_t{-distance_to_lhs, -1.5f * distance_to_top}};
+  }};
 
   {
     const auto [when, where_y] = p::estimate_next_collision(a, a.lhs_paddle());
@@ -500,7 +496,9 @@ TEST_CASE("imperfect ai") {
     std::uint32_t score = 0;
     WHEN("setting = " << setting) {
       for (int i = 0; i < attempts; ++i) {
-        p::arena_t a{[]() -> p::vec_t { return {1.f, 0.f}; }};
+        p::arena_t a{[]() -> std::tuple<p::scalar_t, p::vec_t> {
+          return {240.f, {1.f, 0.f}};
+        }};
         p::ai_t ai{prng(), 25.f / p::z_scores[setting]};
         const auto result = ai.paddle_speed(a, a.rhs_paddle());
         REQUIRE(!!result);
@@ -515,4 +513,26 @@ TEST_CASE("imperfect ai") {
                                      attempts * .05f));
     }
   }
+}
+
+TEST_CASE("make_starter") {
+  std::mt19937 prng{c::rngSeed()};
+  auto starter = p::make_starter(prng());
+
+  int quadrants = 0;
+
+  for (int i = 0; i < 1 << 14; ++i) {
+    const auto [y, vel] = starter();
+    REQUIRE(vel(0) != 0.f);
+    REQUIRE(vel(1) != 0.f);
+    quadrants |= vel(0) < 0.f ? 1 : 2;
+    quadrants |= vel(1) < 0.f ? 4 : 8;
+    CHECK(y >= 20.f);
+    CHECK(y <= 460.f);
+    CHECK(vel.norm() >= 150.f);
+    CHECK(vel.norm() <= 250.f);
+  }
+
+  // puck has been fired into all four quadrants
+  CHECK(quadrants == 15);
 }

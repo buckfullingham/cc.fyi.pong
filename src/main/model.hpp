@@ -143,16 +143,19 @@ private:
 
 class arena_t : public rectangle_t {
 public:
-  explicit arena_t(std::function<vec_t()> next_puck_velocity)
+  explicit arena_t(
+      std::function<std::tuple<scalar_t, vec_t>()> next_puck_velocity)
       : rectangle_t{box_t{vec_t{10, 10}, vec_t{630, 470}}, vec_t{0, 0},
                     colour_t{0, 0, 0, 0}},
-        next_puck_velocity_{std::move(next_puck_velocity)},
-        puck_{
-            vec_t{320, 240},
-            next_puck_velocity_(),
-            5,
-            colour_t{0, 255, 0, 255},
-        },
+        next_puck_velocity_{std::move(next_puck_velocity)}, puck_([this]() {
+          const auto [y, vel] = next_puck_velocity_();
+          return puck_t{
+              vec_t{320, y},
+              vel,
+              5,
+              colour_t{0, 255, 0, 255},
+          };
+        }()),
         lhs_paddle_{
             *this,
             box_t{vec_t{18, 220}, vec_t{22, 260}},
@@ -183,8 +186,9 @@ public:
   auto &rhs_score() { return rhs_score_; }
 
   void restart_puck() {
-    puck().centre() = vec_t{320, 240};
-    puck().velocity() = next_puck_velocity_();
+    const auto [y, vel] = next_puck_velocity_();
+    puck().centre() = vec_t{320, y};
+    puck().velocity() = vel;
   }
 
   std::optional<std::tuple<scalar_t, std::function<void()>>> next_action(
@@ -218,7 +222,7 @@ public:
   }
 
 private:
-  std::function<vec_t()> next_puck_velocity_;
+  std::function<std::tuple<scalar_t, vec_t>()> next_puck_velocity_;
   puck_t puck_;
   paddle_t lhs_paddle_;
   paddle_t rhs_paddle_;
@@ -455,6 +459,27 @@ std::optional<scalar_t> ai_t::paddle_speed(arena_t &a, paddle_t &p) {
     return {};
 
   return when == 0.f ? 0.f : (target - p.centre()(1) + error_dist_(prng_)) / when;
+}
+
+std::function<std::tuple<scalar_t, vec_t>()>
+make_starter(std::mt19937::result_type seed) {
+  return
+      [prng = std::mt19937{seed},
+       theta_dist =
+           std::uniform_real_distribution<float>{
+               constant::pi<float>() / 8.f, constant::pi<float>() * 3.f / 8.f},
+       y_dist = std::uniform_real_distribution<scalar_t>{20, 460},
+       sign_dist = std::uniform_int_distribution<int>{0, 1},
+       speed_dist = std::uniform_real_distribution<float>{
+           150, 250}]() mutable -> std::tuple<scalar_t, vec_t> {
+        const scalar_t theta = theta_dist(prng);
+        const matrix_t signs{
+            {scalar_t(sign_dist(prng) * 2 - 1), 0.f},
+            {0.f, scalar_t(sign_dist(prng) * 2 - 1)},
+        };
+        const scalar_t y = y_dist(prng);
+        return {y, transform::rot(theta) * signs * unit::i * speed_dist(prng)};
+      };
 }
 
 } // namespace pong

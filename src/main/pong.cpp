@@ -93,24 +93,11 @@ int main(int, char **) {
   settings_t settings;
   bool in_play = true;
 
-  pong::arena_t arena{[prng = std::mt19937{std::random_device{}()},
-                       theta_dist =
-                           std::uniform_real_distribution<float>{
-                               pong::constant::pi<float>() / 8.f,
-                               pong::constant::pi<float>() * 3.f / 8.f},
-                       quadrant_dist = std::uniform_int_distribution<int>{0, 3},
-                       speed_dist = std::uniform_real_distribution<float>{
-                           200, 300}]() mutable -> pong::vec_t {
-    const pong::scalar_t quadrant =
-        pong::scalar_t(quadrant_dist(prng)) * pong::constant::pi<float>() / 2.f;
-    const pong::matrix_t rot =
-        pong::transform::rot(theta_dist(prng) + quadrant);
-    return rot * pong::unit::i * speed_dist(prng);
-  }};
+  std::mt19937 prng{std::random_device{}()};
+  pong::arena_t arena{pong::make_starter(prng())};
 
   std::optional<pong::ai_t> ai;
-  ai.emplace(std::random_device{}(),
-             (settings.paddle_size / 2.f + arena.puck().radius()) /
+  ai.emplace(prng(), (settings.paddle_size / 2.f + arena.puck().radius()) /
                  pong::z_scores[settings.ai_skill]);
 
 #ifdef __EMSCRIPTEN__
@@ -155,7 +142,7 @@ int main(int, char **) {
             arena.centre()(1) - settings.paddle_size / 2.f;
         arena.rhs_paddle().box().max()(1) =
             arena.rhs_paddle().box().min()(1) + settings.paddle_size;
-        ai.emplace(std::random_device{}(),
+        ai.emplace(prng(),
                    (settings.paddle_size / 2.f + arena.puck().radius()) /
                        pong::z_scores[settings.ai_skill]);
       }
