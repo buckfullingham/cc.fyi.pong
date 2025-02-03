@@ -38,4 +38,5 @@ jobs:
         path: cmake-build-*/pong-*.tar.gz
 
     - name: deploy
+      if: matrix.build_type == 'Release' && matrix.build_profile == 'emscripten'
       uses: actions/deploy-pages@v4
