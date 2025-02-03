@@ -8,6 +8,10 @@ on:
 
 jobs:
   build:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     strategy:
       matrix:
         build_type: [ Debug, Release ]
@@ -25,3 +29,13 @@ jobs:
         BUILD_TYPE=${{matrix.build_type}}
         ${{github.workspace}}/ci/container.sh
         /tmp/cc.fyi.pong/ci/build.sh
+
+    - name: upload
+      if: matrix.build_type == 'Release' && matrix.build_profile == 'emscripten'
+      uses: actions/upload-artifact@v4
+      with:
+        name: github-pages
+        path: pong-*.tar.gz
+
+    - name: deploy
+      uses: actions/deploy-pages@v4
