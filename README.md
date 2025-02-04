@@ -1,7 +1,5 @@
 ![build status](https://github.com/buckfullingham/cc.fyi.pong/actions/workflows/build.yml/badge.svg)
 
-# cc.fyi.pong
-
 # Build Your Own Pong
 
 This is a solution to the problem posed at https://codingchallenges.fyi/challenges/challenge-pong/.  There is a playable

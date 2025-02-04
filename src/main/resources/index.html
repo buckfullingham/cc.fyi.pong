@@ -3,8 +3,22 @@
 <head>
     <title>PONG</title>
 </head>
-<body style="background-color:black">
-<canvas id="canvas" width="660" height="660"></canvas>
+<style>
+    body {
+        background-color: black;
+    }
+    canvas {
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+        width: 660px;
+        height: 660px;
+    }
+</style>
+<body>
+<canvas id="canvas"></canvas>
 <script type="application/javascript">
     var Module = {
         canvas:
