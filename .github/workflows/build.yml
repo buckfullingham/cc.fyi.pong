@@ -8,25 +8,21 @@ on:
 
 jobs:
   build:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         build_type: [ Release ]
         build_profile: [ emscripten ]
-
-    runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
-
     - name: Build PONG
       id: build
       run: >
         BUILD_TYPE=${{matrix.build_type}}
         ${{github.workspace}}/ci/container.sh
         /tmp/cc.fyi.pong/ci/build.sh
-
     - name: Upload github pages artifact
       id: deployment
       if: >
@@ -35,17 +31,15 @@ jobs:
       uses: actions/upload-pages-artifact@v3
       with:
         path: cmake-build-release-emscripten/github-pages
-
   deploy:
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     needs: build
-
     permissions:
       pages: write
       id-token: write
-
     steps:
       - name: Deploy to github-pages
         id: deployment
