@@ -66,7 +66,7 @@ int main(int, char **) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 
   // Create window with graphics context
-  GLFWwindow *window = glfwCreateWindow(1280, 720, "PONG", nullptr, nullptr);
+  GLFWwindow *window = glfwCreateWindow(660, 660, "PONG", nullptr, nullptr);
   if (window == nullptr)
     return 1;
   glfwMakeContextCurrent(window);
@@ -115,10 +115,13 @@ int main(int, char **) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    auto viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->Pos);
+    ImGui::SetNextWindowSize(viewport->Size);
 
     if (ImGui::Begin("PONG", nullptr,
                      ImGuiWindowFlags_NoScrollbar |
-                         ImGuiWindowFlags_NoResize)) {
+                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDecoration)) {
       settings_t new_settings = settings;
       ImGui::SliderInt("AI skill", &new_settings.ai_skill,
                        settings_t::ai_skill_min, settings_t::ai_skill_max);

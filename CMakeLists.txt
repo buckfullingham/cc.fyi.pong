@@ -27,6 +27,9 @@ add_link_options(
         "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-sASSERTIONS>"
 )
 
+string(RANDOM LENGTH 6 ALPHABET "0123456789" PRNG_SEED)
+message(NOTICE "PRNG_SEED = ${PRNG_SEED}")
+
 enable_testing()
 add_subdirectory(src)
 include(CPack)

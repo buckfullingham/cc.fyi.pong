@@ -34,5 +34,5 @@ target_link_libraries(model PRIVATE
         test-lib
 )
 
-catch_discover_tests(geometry)
-catch_discover_tests(model)
+catch_discover_tests(geometry EXTRA_ARGS "--rng-seed=${PRNG_SEED}")
+catch_discover_tests(model EXTRA_ARGS "--rng-seed=${PRNG_SEED}")
