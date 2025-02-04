@@ -8,14 +8,6 @@ on:
 
 jobs:
   build:
-    permissions:
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-
     strategy:
       matrix:
         build_type: [ Release ]
@@ -28,20 +20,33 @@ jobs:
       with:
         submodules: recursive
 
-    - name: do build
+    - name: Build PONG
+      id: build
       run: >
         BUILD_TYPE=${{matrix.build_type}}
         ${{github.workspace}}/ci/container.sh
         /tmp/cc.fyi.pong/ci/build.sh
 
-    - name: upload github-pages artifact
-      if: matrix.build_type == 'Release' && matrix.build_profile == 'emscripten'
-      uses: actions/upload-artifact@v4
+    - name: Upload github pages artifact
+      id: deployment
+      if: >
+        matrix.build_type == 'Release' &&
+        matrix.build_profile == 'emscripten'
+      uses: actions/upload-pages-artifact@v3
       with:
-        name: github-pages
-        path: cmake-build-release-emscripten/github-pages.tar.gz
+        path: cmake-build-release-emscripten/github-pages
 
-    - name: deploy to github-pages
-      id: deploy
-      if: matrix.build_type == 'Release' && matrix.build_profile == 'emscripten'
-      uses: actions/deploy-pages@v4
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+
+    permissions:
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Deploy to github-pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -21,3 +21,6 @@ ENV BUILD_PROFILE=emscripten
 #  && apt -y install kitware-archive-keyring \
 #  && rm -f /etc/apt/trusted.gpg.d/kitware.gpg \
 #  && apt -y install cmake
+
+RUN useradd pong
+USER pong

@@ -58,5 +58,9 @@ cmake --build . --parallel
 # run tests
 ctest .
 
-cpack -D CPACK_INCLUDE_TOPLEVEL_DIRECTORY=OFF -D CPACK_PACKAGE_FILE_NAME=github-pages -G TGZ .
+# cpack -D CPACK_INCLUDE_TOPLEVEL_DIRECTORY=OFF -D CPACK_PACKAGE_FILE_NAME=github-pages -G TGZ .
 cpack -G TGZ .
+
+mkdir github-pages
+tar xvfz pong*.tar.gz -C github-pages --strip-components=1
+ls -lrt github-pages

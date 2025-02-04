@@ -6,6 +6,7 @@ BUILD_ROOT="${BUILD_ROOT:-"$(readlink -f "$(dirname "$0")/..")"}"
 BUILD_PROFILE="${BUILD_PROFILE:-emscripten}"
 BUILD_CONAN_VOLUME=${CONAN_VOLUME:-conan}
 BUILD_ROOT_IN_CONTAINER=/tmp/"$(basename "$BUILD_ROOT")"
+BUILD_IMAGE="${BUILD_IMAGE:-pong-"$BUILD_PROFILE"}"
 
 test -d "$BUILD_ROOT"
 test -d "$BUILD_ROOT/ci/$BUILD_PROFILE"
@@ -14,7 +15,7 @@ apt update -vy || true
 apt install -vy docker || true
 
 docker build \
-  -t "$BUILD_PROFILE" \
+  -t "$BUILD_IMAGE" \
   -f "$BUILD_ROOT/ci/$BUILD_PROFILE/Dockerfile" \
   "$BUILD_ROOT/ci"
 
@@ -27,7 +28,6 @@ exec docker run \
   -v "${BUILD_CONAN_VOLUME}:/mnt/conan" \
   -e CONAN_HOME=/mnt/conan \
   -e "BUILD_ROOT=${BUILD_ROOT_IN_CONTAINER}" \
-  -e BUILD_PROFILE \
   -e BUILD_TYPE \
-  "$BUILD_PROFILE" \
+  "$BUILD_IMAGE" \
   "$@"
