@@ -10,6 +10,11 @@ jobs:
   build:
     permissions:
       pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
 
     strategy:
       matrix:
@@ -29,13 +34,14 @@ jobs:
         ${{github.workspace}}/ci/container.sh
         /tmp/cc.fyi.pong/ci/build.sh
 
-    - name: upload
+    - name: upload github-pages artifact
       if: matrix.build_type == 'Release' && matrix.build_profile == 'emscripten'
       uses: actions/upload-artifact@v4
       with:
         name: github-pages
         path: cmake-build-*/pong-*.tar.gz
 
-    - name: deploy
+    - name: deploy to github-pages
+      id: deploy
       if: matrix.build_type == 'Release' && matrix.build_profile == 'emscripten'
       uses: actions/deploy-pages@v4
