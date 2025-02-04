@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        build_type: [ Release ]
-        build_profile: [ emscripten ]
+        build_type: [ Debug, Release ]
+        build_profile: [ linux, emscripten ]
     steps:
     - uses: actions/checkout@v4
       with:
@@ -23,7 +23,7 @@ jobs:
         BUILD_TYPE=${{matrix.build_type}}
         ${{github.workspace}}/ci/container.sh
         /tmp/cc.fyi.pong/ci/build.sh
-    - name: Upload github pages artifact
+    - name: Upload github-pages artifact
       id: deployment
       if: >
         matrix.build_type == 'Release' &&
@@ -33,13 +33,13 @@ jobs:
         path: cmake-build-release-emscripten/github-pages
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     needs: build
     permissions:
       pages: write
       id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to github-pages
         id: deployment
