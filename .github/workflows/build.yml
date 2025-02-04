@@ -39,7 +39,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: github-pages
-        path: cmake-build-*/pong-*.tar.gz
+        path: cmake-build-*/github-pages.tar.gz
 
     - name: deploy to github-pages
       id: deploy

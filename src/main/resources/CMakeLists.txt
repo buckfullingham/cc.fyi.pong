@@ -1,3 +1,3 @@
-install(FILES pong.html
-        DESTINATION html
+install(FILES index.html
+  DESTINATION .
 )
