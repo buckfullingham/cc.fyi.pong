@@ -23,7 +23,6 @@ docker volume create "${BUILD_CONAN_VOLUME}" || true
 
 exec docker run \
   -i \
-  -u 0 \
   -v "${BUILD_ROOT}:${BUILD_ROOT_IN_CONTAINER}" \
   -v "${BUILD_CONAN_VOLUME}:/mnt/conan" \
   -e CONAN_HOME=/mnt/conan \
