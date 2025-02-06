@@ -23,7 +23,7 @@ using colour_t = Eigen::Matrix<std::uint8_t, 4, 1>;
 /**
  * A function that oscillates linearly from 0 to upper_bound - 1.
  *
- * e.g. for upper_bound == 4, this will yield (for 0 <= x << 12):
+ * e.g. for upper_bound == 4, this will yield (for 0 <= x < 12):
  *     0 1 2 3 2 1 0 1 2 3 2 1
  */
 inline std::uint64_t linear_oscillation(const std::uint64_t upper_bound,
