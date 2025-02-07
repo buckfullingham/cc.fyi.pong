@@ -5,6 +5,8 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  schedule:
+    - cron: "0 0 * * 0"
 
 jobs:
   build:
@@ -14,23 +16,23 @@ jobs:
         build_type: [ Debug, Release ]
         build_profile: [ linux, emscripten ]
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - name: Build PONG
-      id: build
-      run: >
-        BUILD_TYPE=${{matrix.build_type}}
-        ${{github.workspace}}/ci/container.sh
-        /tmp/cc.fyi.pong/ci/build.sh
-    - name: Upload github-pages artifact
-      id: deployment
-      if: >
-        matrix.build_type == 'Release' &&
-        matrix.build_profile == 'emscripten'
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: cmake-build-release-emscripten/github-pages
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Build PONG
+        id: build
+        run: >
+          BUILD_TYPE=${{matrix.build_type}}
+          ${{github.workspace}}/ci/container.sh
+          /tmp/cc.fyi.pong/ci/build.sh
+      - name: Upload github-pages artifact
+        id: deployment
+        if: >
+          matrix.build_type == 'Release' &&
+          matrix.build_profile == 'emscripten'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: cmake-build-release-emscripten/github-pages
   deploy:
     runs-on: ubuntu-latest
     needs: build
