@@ -250,7 +250,7 @@ TEST_CASE("linear oscillation inverse") {
 TEST_CASE("estimating next paddle collision at rhs, starting height") {
   auto [puck, box] = []() {
     p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -288,7 +288,7 @@ TEST_CASE("estimating next paddle collision at rhs, starting height") {
 TEST_CASE("estimating next paddle collision at rhs, half height") {
   auto [puck, box] = []() {
     p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -331,7 +331,7 @@ TEST_CASE("estimating next but one paddle collision") {
 
   auto [puck, box] = []() {
     p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -360,7 +360,7 @@ TEST_CASE("estimating next but one paddle collision") {
 TEST_CASE("estimating next paddle collision at lhs, starting height") {
   auto [puck, box] = []() {
     p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -387,7 +387,7 @@ TEST_CASE("estimating next paddle collision at lhs, starting height") {
 TEST_CASE("estimating next paddle collision at lhs, 1.5 height") {
   auto [puck, box] = []() {
     p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {}}; }};
+        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
     return std::make_tuple(
         a.puck(),
         p::box_t{

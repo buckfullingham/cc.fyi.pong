@@ -1,4 +1,6 @@
-FROM emscripten/emsdk
+# emscripten deploy their arm64 images under specific tags
+ARG EMSDK_IMAGE_TAG=latest
+FROM emscripten/emsdk:${EMSDK_IMAGE_TAG}
 
 RUN apt -y update \
  && apt -y upgrade \

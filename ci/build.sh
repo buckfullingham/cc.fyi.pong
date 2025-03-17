@@ -23,10 +23,10 @@ python3 --version
 pip3 --version
 $CMAKE --version
 
-conan profile detect || true
+mkdir -p "$CONAN_HOME/profiles"
+mako-render "$BUILD_ROOT/ci/$BUILD_PROFILE/conan.profile.mako" > "$CONAN_HOME/profiles/default"
 
 CONAN_SETTINGS=(
-  --profile="$BUILD_ROOT/ci/$BUILD_PROFILE/conan.profile"
   -s build_type="$BUILD_TYPE"
   -c tools.cmake.cmake_layout:build_folder_vars="['settings.build_type', 'settings.os']"
 )
