@@ -15,11 +15,13 @@ docker --version || (
   apt -y update && apt -y install docker
 )
 
+EMSDK_IMAGE_TAG=4.0.2
+
 if [ "$(uname -m)" == arm64 ]; then
-  BUILD_ARGS=(--build-arg EMSDK_IMAGE_TAG=4.0.5-arm64)
-else
-  BUILD_ARGS=(--build-arg EMSDK_IMAGE_TAG=4.0.5)
+  EMSDK_IMAGE_TAG="${EMSDK_IMAGE_TAG}-arm64"
 fi
+
+BUILD_ARGS=(--build-arg EMSDK_IMAGE_TAG="$EMSDK_IMAGE_TAG")
 
 if [ -t 1 ]; then
   TTY_ARG=(--tty)
@@ -36,7 +38,9 @@ docker build \
 docker volume create "${BUILD_CONAN_VOLUME}" || true
 
 exec docker run \
+  --rm \
   --interactive \
+  --network=host \
   "${TTY_ARG[@]}" \
   -v "${BUILD_ROOT}:${BUILD_ROOT_IN_CONTAINER}" \
   -v "${BUILD_CONAN_VOLUME}:/mnt/conan" \

@@ -21,8 +21,14 @@
 <canvas id="canvas"></canvas>
 <script type="application/javascript">
     var Module = {
-        canvas:
-            (() => document.getElementById('canvas'))()
+        preRun: [],
+        postRun: [],
+        print: function(text) { console.log('stdout: ' + text) },
+        printErr: function(text) { console.log('stderr: ' + text) },
+        setStatus: function(text) {},
+        totalDependencies: 0,
+        monitorRunDependencies: function(left) {},
+        canvas: (() => document.getElementById('canvas'))()
     };
 </script>
 <script type="application/javascript" src="pong.js"></script>

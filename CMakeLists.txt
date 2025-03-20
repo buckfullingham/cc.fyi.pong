@@ -25,6 +25,7 @@ add_compile_options(
 add_link_options(
         "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-fwasm-exceptions>"
         "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-sASSERTIONS>"
+        "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-Wno-linkflags>"
 )
 
 string(RANDOM LENGTH 1 ALPHABET "123456789" PRNG_SEED_PREFIX)

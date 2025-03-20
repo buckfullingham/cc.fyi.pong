@@ -13,3 +13,4 @@ COPY ../requirements.txt /tmp/
 RUN pip3 install -U -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
 ENV BUILD_PROFILE=emscripten
+CMD /bin/bash
