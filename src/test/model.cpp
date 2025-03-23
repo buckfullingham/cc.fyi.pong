@@ -250,8 +250,9 @@ TEST_CASE("linear oscillation inverse") {
 
 TEST_CASE("estimating next paddle collision at rhs, starting height") {
   auto [puck, box] = []() {
-    p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
+    p::arena_t a{[]() -> std::tuple<p::scalar_t, p::vec_t> {
+      return {240.f, {0.f, 0.f}};
+    }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -288,8 +289,9 @@ TEST_CASE("estimating next paddle collision at rhs, starting height") {
 
 TEST_CASE("estimating next paddle collision at rhs, half height") {
   auto [puck, box] = []() {
-    p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
+    p::arena_t a{[]() -> std::tuple<p::scalar_t, p::vec_t> {
+      return {240.f, {0.f, 0.f}};
+    }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -331,8 +333,9 @@ TEST_CASE("estimating next but one paddle collision") {
   // with the lhs paddle after initially travelling rightwards
 
   auto [puck, box] = []() {
-    p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
+    p::arena_t a{[]() -> std::tuple<p::scalar_t, p::vec_t> {
+      return {240.f, {0.f, 0.f}};
+    }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -360,8 +363,9 @@ TEST_CASE("estimating next but one paddle collision") {
 
 TEST_CASE("estimating next paddle collision at lhs, starting height") {
   auto [puck, box] = []() {
-    p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
+    p::arena_t a{[]() -> std::tuple<p::scalar_t, p::vec_t> {
+      return {240.f, {0.f, 0.f}};
+    }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -387,8 +391,9 @@ TEST_CASE("estimating next paddle collision at lhs, starting height") {
 
 TEST_CASE("estimating next paddle collision at lhs, 1.5 height") {
   auto [puck, box] = []() {
-    p::arena_t a{
-        []() -> std::tuple<p::scalar_t, p::vec_t> { return {240.f, {0.f, 0.f}}; }};
+    p::arena_t a{[]() -> std::tuple<p::scalar_t, p::vec_t> {
+      return {240.f, {0.f, 0.f}};
+    }};
     return std::make_tuple(
         a.puck(),
         p::box_t{
@@ -438,26 +443,31 @@ TEST_CASE("estimating next paddle collision at lhs, 1.5 height") {
 TEST_CASE("estimate_next_collision stability") {
   std::mt19937 prng{c::rngSeed()};
   std::exponential_distribution<float> dt_dist{60.f};
-  p::arena_t a{make_starter()};
+  bool started = false;
+  p::arena_t a{[&, delegate = make_starter()]() {
+    started = true;
+    return delegate();
+  }};
 
-  // Only going past or colliding with a paddle should change the estimated
-  // point of the next collision.  Check that as we advance time, the estimate
-  // doesn't change.
+  // Only going past or colliding with a paddle, or the game being restarted
+  // should change the estimated point of the next collision.  Check that as we
+  // advance time, the estimate doesn't change.
   for (int i = 0; i < 1 << 10; ++i) {
     const auto old_dx_sign = std::signbit(a.puck().velocity()(0));
     const auto [old_lhs_when, old_lhs_estimate] =
         p::estimate_next_collision(a, a.lhs_paddle());
     const auto [old_rhs_when, old_rhs_estimate] =
         p::estimate_next_collision(a, a.rhs_paddle());
+    started = false;
     a.advance_time(dt_dist(prng));
     const auto new_dx_sign = std::signbit(a.puck().velocity()(0));
     const auto [new_lhs_when, new_lhs_estimate] =
         p::estimate_next_collision(a, a.lhs_paddle());
     const auto [new_rhs_when, new_rhs_estimate] =
         p::estimate_next_collision(a, a.rhs_paddle());
-    const auto do_not_check = old_lhs_when == 0 || old_rhs_when == 0 ||
-                              new_lhs_when == 0 || new_rhs_when == 0 ||
-                              old_dx_sign != new_dx_sign;
+    const auto do_not_check = started || old_lhs_when == 0 ||
+                              old_rhs_when == 0 || new_lhs_when == 0 ||
+                              new_rhs_when == 0 || old_dx_sign != new_dx_sign;
     if (!do_not_check) {
       CHECK_THAT(new_lhs_estimate, m::WithinAbs(old_lhs_estimate, 2.f));
       CHECK_THAT(new_rhs_estimate, m::WithinAbs(old_rhs_estimate, 2.f));

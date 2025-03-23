@@ -6,6 +6,7 @@
 #include <numeric>
 #include <optional>
 #include <random>
+#include <utility>
 
 namespace pong {
     class circle_t;
