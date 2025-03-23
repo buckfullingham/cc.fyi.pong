@@ -4,6 +4,7 @@
 #include "model.hpp"
 #include <cstring>
 #include <functional>
+#include <iostream>
 #include <random>
 #include <tuple>
 

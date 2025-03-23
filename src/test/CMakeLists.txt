@@ -10,6 +10,7 @@ add_library(test-lib INTERFACE
 target_link_libraries(test-lib INTERFACE
         Catch2::Catch2WithMain
         Eigen3::Eigen
+        pong-objects
 )
 
 target_include_directories(test-lib INTERFACE

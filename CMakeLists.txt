@@ -24,7 +24,7 @@ add_compile_options(
 
 add_link_options(
         "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-fwasm-exceptions>"
-        "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-sASSERTIONS>"
+        "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-sASSERTIONS=2>"
         "$<$<STREQUAL:${BUILD_PROFILE},emscripten>:-Wno-linkflags>"
 )
 

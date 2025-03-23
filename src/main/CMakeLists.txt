@@ -16,6 +16,14 @@ target_link_libraries(imgui-backend PUBLIC
         opengl::opengl
 )
 
+add_library(pong-objects STATIC
+        model.cpp
+)
+
+target_link_libraries(pong-objects PUBLIC
+        Eigen3::Eigen
+)
+
 add_executable(pong.js
         pong.cpp
 )
@@ -26,8 +34,8 @@ target_link_options(pong.js PRIVATE
 
 target_link_libraries(pong.js PRIVATE
         imgui-backend
-        Eigen3::Eigen
         "$<$<STREQUAL:${BUILD_PROFILE},linux>:glfw>"
+        pong-objects
 )
 
 install(FILES

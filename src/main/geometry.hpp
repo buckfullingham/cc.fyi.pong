@@ -3,7 +3,6 @@
 
 #include <Eigen/Dense>
 #include <cmath>
-#include <concepts>
 
 namespace pong {
 
@@ -50,7 +49,7 @@ inline matrix_t rot(scalar_t theta) {
 /**
  * add (subtract) a border around a(n immutable) box
  */
-box_t bordered(box_t result, const scalar_t border_size) {
+inline box_t bordered(box_t result, const scalar_t border_size) {
   const vec_t v = {border_size, border_size};
   result.min() -= v;
   result.max() += v;

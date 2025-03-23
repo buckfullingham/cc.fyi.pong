@@ -52,6 +52,11 @@ struct settings_t {
   friend bool operator==(const settings_t &, const settings_t &) = default;
 };
 
+std::tuple<pong::scalar_t, pong::vec_t> starter() {
+    static auto starter = pong::make_starter(std::random_device{}());
+    return starter();
+}
+
 } // namespace
 
 int main(int, char **) {
@@ -94,7 +99,7 @@ int main(int, char **) {
   bool in_play = true;
 
   std::mt19937 prng{std::random_device{}()};
-  pong::arena_t arena{pong::make_starter(prng())};
+  pong::arena_t arena{starter};
 
   std::optional<pong::ai_t> ai;
   ai.emplace(prng(), (settings.paddle_size / 2.f + arena.puck().radius()) /
