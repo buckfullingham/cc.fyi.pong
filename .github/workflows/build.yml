@@ -30,7 +30,7 @@ jobs:
         if: >
           matrix.build_type == 'Release' &&
           matrix.build_profile == 'emscripten'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: cmake-build-release-emscripten/github-pages
   deploy:
